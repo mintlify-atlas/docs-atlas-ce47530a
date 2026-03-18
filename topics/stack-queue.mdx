@@ -1,0 +1,221 @@
+---
+title: Stack and Queue
+description: LIFO and FIFO data structures that restrict how you access elements. Stacks power recursion and undo systems; queues power BFS and task scheduling.
+---
+
+Stacks and queues are **restricted-access** data structures. Instead of allowing access to any element by index, they expose only specific operations that enforce an ordering discipline. This constraint is a feature — it models many real-world systems and enables elegant algorithmic solutions.
+
+## Stack (LIFO — Last In, First Out)
+
+A stack works like a pile of plates: you can only add to the top and remove from the top. The last element pushed is the first one popped.
+
+**Core operations:**
+- **push(value)** — add an element to the top: O(1)
+- **pop()** — remove and return the top element: O(1)
+- **peek()** — return the top element without removing it: O(1)
+- **isEmpty()** — check if the stack has any elements: O(1)
+
+### Stack complexity
+
+| Operation | Time  | Space |
+|-----------|-------|-------|
+| push      | O(1)  | O(1)  |
+| pop       | O(1)  | O(1)  |
+| peek      | O(1)  | O(1)  |
+| isEmpty   | O(1)  | O(1)  |
+
+**Space complexity**: O(n) total for n elements.
+
+## Queue (FIFO — First In, First Out)
+
+A queue works like a line at a ticket counter: you join at the back and are served from the front. The first element enqueued is the first one dequeued.
+
+**Core operations:**
+- **enqueue(value)** — add an element to the back: O(1)
+- **dequeue()** — remove and return the front element: O(1)
+- **peek()** — return the front element without removing it: O(1)
+- **isEmpty()** — check if the queue has any elements: O(1)
+
+### Queue complexity
+
+| Operation | Time  | Space |
+|-----------|-------|-------|
+| enqueue   | O(1)  | O(1)  |
+| dequeue   | O(1)  | O(1)  |
+| peek      | O(1)  | O(1)  |
+| isEmpty   | O(1)  | O(1)  |
+
+<Note>
+  Implementing a queue naively with a JavaScript array using `push` (enqueue) and `shift` (dequeue) gives O(n) dequeue because `shift` re-indexes every element. For O(1) dequeue, use a doubly linked list or a circular buffer.
+</Note>
+
+## TypeScript code examples
+
+```typescript
+// Stack — implemented with an array
+class Stack<T> {
+  private items: T[] = [];
+
+  push(value: T): void {
+    this.items.push(value);
+  }
+
+  pop(): T | undefined {
+    return this.items.pop();
+  }
+
+  peek(): T | undefined {
+    return this.items[this.items.length - 1];
+  }
+
+  isEmpty(): boolean {
+    return this.items.length === 0;
+  }
+
+  size(): number {
+    return this.items.length;
+  }
+}
+
+// Classic stack problem: balanced parentheses — O(n) time, O(n) space
+function isBalanced(s: string): boolean {
+  const stack = new Stack<string>();
+  const pairs: Record<string, string> = { ')': '(', '}': '{', ']': '[' };
+  for (const ch of s) {
+    if ('({['.includes(ch)) {
+      stack.push(ch);
+    } else if (ch in pairs) {
+      if (stack.isEmpty() || stack.pop() !== pairs[ch]) return false;
+    }
+  }
+  return stack.isEmpty();
+}
+
+// Queue — implemented with two arrays for O(1) amortized dequeue
+class Queue<T> {
+  private inbox: T[] = [];   // for enqueue
+  private outbox: T[] = [];  // for dequeue
+
+  enqueue(value: T): void {
+    this.inbox.push(value);
+  }
+
+  dequeue(): T | undefined {
+    if (this.outbox.length === 0) {
+      // Transfer all items from inbox to outbox (reverses order)
+      while (this.inbox.length > 0) {
+        this.outbox.push(this.inbox.pop()!);
+      }
+    }
+    return this.outbox.pop();
+  }
+
+  peek(): T | undefined {
+    if (this.outbox.length > 0) return this.outbox[this.outbox.length - 1];
+    return this.inbox[0];
+  }
+
+  isEmpty(): boolean {
+    return this.inbox.length === 0 && this.outbox.length === 0;
+  }
+}
+
+// BFS using a queue — O(V + E)
+function bfs(graph: Map<number, number[]>, start: number): number[] {
+  const visited = new Set<number>();
+  const queue = new Queue<number>();
+  const order: number[] = [];
+
+  queue.enqueue(start);
+  visited.add(start);
+
+  while (!queue.isEmpty()) {
+    const node = queue.dequeue()!;
+    order.push(node);
+    for (const neighbor of graph.get(node) ?? []) {
+      if (!visited.has(neighbor)) {
+        visited.add(neighbor);
+        queue.enqueue(neighbor);
+      }
+    }
+  }
+  return order;
+}
+
+// Monotonic stack — next greater element — O(n)
+function nextGreaterElement(nums: number[]): number[] {
+  const result = new Array(nums.length).fill(-1);
+  const stack: number[] = []; // stores indices
+  for (let i = 0; i < nums.length; i++) {
+    while (stack.length > 0 && nums[i] > nums[stack[stack.length - 1]]) {
+      const idx = stack.pop()!;
+      result[idx] = nums[i];
+    }
+    stack.push(i);
+  }
+  return result;
+}
+```
+
+## Common interview patterns
+
+<CardGroup cols={2}>
+  <Card title="Monotonic stack" icon="chart-line">
+    Maintain a stack that is always sorted (increasing or decreasing). When a new element breaks the order, pop until it doesn't. Classic problems: next greater element, largest rectangle in histogram, daily temperatures.
+  </Card>
+  <Card title="BFS with a queue" icon="sitemap">
+    Level-order traversal of trees and graphs uses a queue. Enqueue the start node, then in a loop: dequeue a node, process it, enqueue all unvisited neighbors. The queue naturally enforces visiting nodes level by level.
+  </Card>
+</CardGroup>
+
+<Tip>
+  A **deque** (double-ended queue) supports O(1) push and pop from both ends. It enables the sliding window maximum problem — maintain a decreasing monotonic deque to always know the max of the current window in O(1).
+</Tip>
+
+## Common use cases
+
+**Stack:**
+- **Call stack**: Function calls are pushed onto the call stack; when a function returns, it's popped.
+- **Undo/redo**: Each action is pushed; undo pops from the undo stack and pushes onto the redo stack.
+- **Balanced parentheses checking**: Push opening brackets, pop when you see a closing bracket.
+- **Expression evaluation**: Operators and operands can be processed with a stack (Shunting Yard algorithm).
+
+**Queue:**
+- **Breadth-first search (BFS)**: Processes nodes level by level in a graph or tree.
+- **Task scheduling**: OS schedulers, print queues, message queues all use FIFO ordering.
+- **Streaming data**: Buffer incoming data while the consumer processes at its own pace.
+
+## How to explain them in elitecode
+
+**Stack:**
+> "A stack is LIFO — Last In, First Out. Think of a stack of books: you can only add or remove from the top. The core operations are push, pop, and peek, all O(1). The most important use case to explain is the call stack — every time you make a function call, a frame is pushed; when it returns, the frame is popped. That's also why recursive functions can cause a stack overflow."
+
+**Queue:**
+> "A queue is FIFO — First In, First Out. Think of a checkout line: you join at the back and leave from the front. Enqueue adds to the back, dequeue removes from the front. The key use case is BFS — I use a queue to process all nodes at distance 1 before distance 2, which is what gives BFS its level-by-level property."
+
+**Monotonic stack (bonus):**
+> "A monotonic stack is a stack where I maintain a sorted invariant. When I process a new element that would break the order, I pop everything smaller. This lets me answer 'next greater element' queries in O(n) total instead of O(n²)."
+
+<Warning>
+  When explaining the queue, interviewers often ask about the naive array implementation. Be explicit: using JavaScript's `array.shift()` for dequeue is O(n) because it re-indexes the array. A proper O(1) queue uses a linked list or the two-stacks trick.
+</Warning>
+
+## Common interview questions
+
+<AccordionGroup>
+  <Accordion title="How do you implement a queue using two stacks?">
+    Use two stacks: `inbox` and `outbox`. **Enqueue** always pushes to `inbox` (O(1)). **Dequeue** pops from `outbox`; if `outbox` is empty, transfer all elements from `inbox` to `outbox` first (O(n) in that moment). Because each element is moved at most once, the amortized cost of dequeue is O(1).
+  </Accordion>
+  <Accordion title="How do you implement a stack using two queues?">
+    Use two queues `q1` and `q2`. To **push**: enqueue to `q1`. To **pop**: move all but the last element from `q1` to `q2`, then dequeue the last element from `q1` (that's your result). Swap `q1` and `q2`. Each pop is O(n). Alternatively, push is O(n) and pop is O(1) — swap which queue you maintain as the "current" one.
+  </Accordion>
+  <Accordion title="What is a monotonic stack and what problems does it solve?">
+    A monotonic stack maintains elements in either strictly increasing or strictly decreasing order. When you encounter an element that violates the order, you pop until the order is restored. This lets you efficiently find the next greater or smaller element for every position in O(n) total time. Classic problems: "Daily Temperatures", "Largest Rectangle in Histogram", "Trapping Rain Water".
+  </Accordion>
+  <Accordion title="What is the difference between a stack and a recursion call stack?">
+    They are the same concept. Recursive function calls are managed by the operating system's call stack — each invocation pushes a stack frame (containing local variables and the return address), and each return pops it. This is why recursive DFS and iterative DFS with an explicit stack are equivalent — you are literally replicating what the call stack does, but manually.
+  </Accordion>
+  <Accordion title="What is a circular buffer and why is it used for queues?">
+    A circular buffer (or ring buffer) is a fixed-size array where the head and tail indices wrap around using modulo arithmetic. It achieves O(1) enqueue and dequeue without the memory fragmentation of a linked list and without the O(n) shift cost of a plain array. It is commonly used in OS kernel buffers and network I/O queues.
+  </Accordion>
+</AccordionGroup>

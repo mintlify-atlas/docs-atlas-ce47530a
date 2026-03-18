@@ -1,0 +1,64 @@
+---
+title: 'Environment variables'
+description: 'Configure API keys and service URLs for the elitecode frontend.'
+---
+
+All environment variables are consumed by the Next.js frontend. Create a `.env.local` file in the root of the Next.js project to set them for local development.
+
+<Warning>
+All three variables use the `NEXT_PUBLIC_` prefix, which means they are **embedded into the browser bundle at build time**. Anyone who loads the app can read these values from the compiled JavaScript. Do not use them with keys that have broad permissions or high spending limits.
+</Warning>
+
+## Variables
+
+<ParamField path="NEXT_PUBLIC_OPENAI_API_KEY" type="string" required>
+  OpenAI API key used to call the GPT-3.5-turbo chat completions endpoint. After a user's explanation is transcribed, this key is used client-side in `src/pages/api/openai.ts` to request feedback.
+
+  The OpenAI client is initialized with `dangerouslyAllowBrowser: true`, which suppresses the SDK's warning about exposing API keys in browser contexts. Treat this key as a limited, low-stakes key and monitor its usage in the OpenAI dashboard.
+
+  Example: `sk-proj-...`
+</ParamField>
+
+<ParamField path="NEXT_PUBLIC_ELEVEN_API_KEY" type="string" required>
+  ElevenLabs API key used to convert text feedback into speech audio. Called client-side from `src/pages/api/textToSpeech.ts` using the `xi-api-key` request header against the ElevenLabs `/v1/text-to-speech` endpoint.
+
+  Example: `sk_...`
+</ParamField>
+
+<ParamField path="NEXT_PUBLIC_API_URL" type="string" required>
+  Base URL of the Flask/Whisper backend. The frontend appends `/whisper` to this URL when posting audio recordings for transcription.
+
+  For local development this is typically `http://localhost:8000`. For production, set it to the public URL of your deployed Whisper backend.
+
+  Example: `http://localhost:8000`
+</ParamField>
+
+## Example `.env.local`
+
+```bash .env.local
+NEXT_PUBLIC_OPENAI_API_KEY=sk-proj-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+NEXT_PUBLIC_ELEVEN_API_KEY=sk_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+NEXT_PUBLIC_API_URL=http://localhost:8000
+```
+
+<Note>
+`.env.local` is listed in `.gitignore` by default in Next.js projects. Never commit this file to version control.
+</Note>
+
+## Security considerations
+
+Because these variables are prefixed with `NEXT_PUBLIC_`, Next.js inlines their values into the client-side JavaScript bundle during `next build`. This means:
+
+- The values are visible in your production JS assets to anyone who inspects the page source.
+- Rotating a key requires a full rebuild and redeployment of the frontend.
+- Rate limits and spending caps on your OpenAI and ElevenLabs accounts are your primary protection against abuse.
+
+<Tip>
+Create separate API keys scoped to minimum permissions for elitecode. Set monthly spend limits on your OpenAI account and monitor ElevenLabs character usage to catch unexpected spikes.
+</Tip>
+
+## Production environment
+
+When deploying to Vercel, add these variables in **Project Settings → Environment Variables**. Vercel will inject them at build time.
+
+For other hosting platforms, set them as build-time environment variables in your CI/CD pipeline or server configuration before running `next build`.

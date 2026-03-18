@@ -1,0 +1,204 @@
+---
+title: Hash Table
+description: A data structure that maps keys to values using a hash function for O(1) average-case insert, lookup, and delete. The backbone of frequency counting, caching, and deduplication.
+---
+
+A hash table (also called a hash map or dictionary) stores **key-value pairs** and uses a **hash function** to convert each key into an index in an underlying array. When you do `map.get("name")`, the runtime runs the hash function on `"name"`, jumps directly to the computed index, and returns the value — all in O(1) time.
+
+The source code in elitecode describes a hash table as a "data structure that maps keys to values."
+
+## How hashing works
+
+1. **Hash function**: Takes a key (string, number, object) and returns an integer. For a string key, a simple approach sums the character codes and applies modulo: `hash = sum(charCodes) % tableSize`.
+2. **Index mapping**: The integer maps to a slot in the backing array: `index = hash(key) % array.length`.
+3. **Store/retrieve**: The value is stored at (or retrieved from) that index.
+
+<Warning>
+  Two different keys can produce the same index — this is called a **collision**. All real hash table implementations must handle collisions.
+</Warning>
+
+## Collision resolution
+
+| Strategy               | How it works                                                                                      | Trade-off                                   |
+|------------------------|---------------------------------------------------------------------------------------------------|---------------------------------------------|
+| **Chaining**           | Each slot holds a linked list of all key-value pairs that hash to that index.                     | Simple; degrades to O(n) if many collisions |
+| **Open addressing**    | If a slot is occupied, probe for the next open slot (linear, quadratic, or double hashing).       | Better cache performance; sensitive to load factor |
+| **Robin Hood hashing** | Variant of open addressing that steals slots from "rich" entries to reduce variance.              | More complex; very cache-friendly            |
+
+<Note>
+  JavaScript's `Map` and Python's `dict` use a variant of open addressing. Java's `HashMap` uses chaining. The underlying strategy affects performance under high load but is usually invisible at the interface level.
+</Note>
+
+## Time and space complexity
+
+| Operation | Average | Worst  | Notes                                    |
+|-----------|---------|--------|------------------------------------------|
+| Insert    | O(1)    | O(n)   | Worst case: all keys collide             |
+| Lookup    | O(1)    | O(n)   | Worst case: all keys in one chain        |
+| Delete    | O(1)    | O(n)   | Same reasoning                           |
+| Resize    | O(n)    | O(n)   | Triggered when load factor threshold hit |
+
+**Space complexity**: O(n) for n key-value pairs.
+
+<Tip>
+  The average O(1) holds when the load factor (ratio of entries to slots) stays below a threshold — typically 0.75. When it exceeds this, the table resizes (doubles) and rehashes all entries.
+</Tip>
+
+## TypeScript code examples
+
+```typescript
+// Using the built-in Map — the idiomatic choice
+const phoneBook = new Map<string, string>();
+phoneBook.set('Alice', '555-1234');
+phoneBook.set('Bob', '555-5678');
+
+console.log(phoneBook.get('Alice'));    // '555-1234'
+console.log(phoneBook.has('Charlie')); // false
+phoneBook.delete('Bob');
+console.log(phoneBook.size);           // 1
+
+// Frequency counting — O(n)
+function charFrequency(s: string): Map<string, number> {
+  const freq = new Map<string, number>();
+  for (const ch of s) {
+    freq.set(ch, (freq.get(ch) ?? 0) + 1);
+  }
+  return freq;
+}
+
+// Two Sum — O(n) time, O(n) space
+function twoSum(nums: number[], target: number): [number, number] | null {
+  const seen = new Map<number, number>(); // value -> index
+  for (let i = 0; i < nums.length; i++) {
+    const complement = target - nums[i];
+    if (seen.has(complement)) {
+      return [seen.get(complement)!, i];
+    }
+    seen.set(nums[i], i);
+  }
+  return null;
+}
+
+// Anagram check — O(n)
+function isAnagram(s: string, t: string): boolean {
+  if (s.length !== t.length) return false;
+  const freq = new Map<string, number>();
+  for (const ch of s) freq.set(ch, (freq.get(ch) ?? 0) + 1);
+  for (const ch of t) {
+    const count = freq.get(ch);
+    if (!count) return false;
+    freq.set(ch, count - 1);
+  }
+  return true;
+}
+
+// Simple custom hash table (for illustration)
+class HashTable<V> {
+  private buckets: Array<Array<[string, V]>>;
+  private size: number;
+
+  constructor(size = 53) {
+    this.size = size;
+    this.buckets = new Array(size).fill(null).map(() => []);
+  }
+
+  private hash(key: string): number {
+    let total = 0;
+    const PRIME = 31;
+    for (let i = 0; i < Math.min(key.length, 100); i++) {
+      total = (total * PRIME + key.charCodeAt(i)) % this.size;
+    }
+    return total;
+  }
+
+  set(key: string, value: V): void {
+    const idx = this.hash(key);
+    const bucket = this.buckets[idx];
+    const existing = bucket.find(([k]) => k === key);
+    if (existing) {
+      existing[1] = value; // update
+    } else {
+      bucket.push([key, value]); // chaining
+    }
+  }
+
+  get(key: string): V | undefined {
+    const idx = this.hash(key);
+    const pair = this.buckets[idx].find(([k]) => k === key);
+    return pair?.[1];
+  }
+
+  delete(key: string): boolean {
+    const idx = this.hash(key);
+    const bucket = this.buckets[idx];
+    const pos = bucket.findIndex(([k]) => k === key);
+    if (pos === -1) return false;
+    bucket.splice(pos, 1);
+    return true;
+  }
+}
+```
+
+## Common interview patterns
+
+<CardGroup cols={3}>
+  <Card title="Frequency maps" icon="chart-bar">
+    Count occurrences of characters, words, or numbers. Build a `Map<T, number>` in one pass, then query it. Foundation for anagram detection, majority element, and top K frequent elements.
+  </Card>
+  <Card title="Anagram / grouping" icon="layer-group">
+    Group strings that are anagrams of each other by sorting each string as a key. All anagrams share the same sorted form. Run time O(n * k log k) where k is the average string length.
+  </Card>
+  <Card title="Two-pass complement" icon="arrows-left-right">
+    The two-sum pattern: on first pass, hash values to indices. On second pass (or same pass), check if the complement exists. Generalizes to three-sum, four-sum, and subarray-sum-equals-k.
+  </Card>
+</CardGroup>
+
+<Tip>
+  When a problem involves "has this been seen before?" or "count occurrences of X", reach for a hash table. It converts O(n²) brute-force solutions to O(n).
+</Tip>
+
+## Common use cases
+
+- **Caching / memoization**: Store the result of an expensive function call keyed by its inputs. Avoids recomputing.
+- **Frequency counting**: Count how often each element appears — building block of histogram problems.
+- **Deduplication**: Add all elements to a `Set` (a hash set) to remove duplicates in O(n).
+- **Indexing**: Databases use hash indexes for O(1) equality lookups (as opposed to B-tree indexes for range queries).
+
+## How to explain it in elitecode
+
+**Start with the core idea:**
+> "A hash table maps keys to values using a hash function. The hash function takes a key — a string, number, or any hashable type — and produces an integer index. I store the value at that index in an underlying array, which gives me O(1) average-case insert and lookup."
+
+**Explain collisions:**
+> "The challenge is collisions — two keys can hash to the same index. There are two main ways to handle this: chaining, where each slot holds a linked list of all colliding entries; and open addressing, where you probe for the next open slot. JavaScript's `Map` uses open addressing internally."
+
+**Talk about the load factor:**
+> "Performance degrades as the table fills up. The load factor — number of entries divided by number of slots — should stay below about 0.75. When it exceeds that, the table resizes (usually doubles) and rehashes everything, which is O(n) but happens infrequently, so the amortized cost stays O(1)."
+
+**Close with interview applications:**
+> "In interviews, hash tables are the go-to tool for frequency counting, two-sum variants, and grouping problems. The two-sum pattern is: as I iterate through the array, I check whether `target - current` is already in my map. If it is, I found my pair. If not, I add `current` to the map and keep going."
+
+## Common interview questions
+
+<AccordionGroup>
+  <Accordion title="What is a hash collision and how is it handled?">
+    A collision occurs when two different keys produce the same hash index. The two main resolution strategies are:
+    
+    - **Chaining**: Each bucket holds a linked list of all entries mapping to that index. Lookup requires scanning the list.
+    - **Open addressing**: If a slot is taken, probe adjacent slots (linear probing: +1, +2, ...; quadratic probing: +1, +4, +9, ...). The table must have some empty slots to terminate probing.
+    
+    With a good hash function and a load factor below 0.75, collisions are rare and average-case O(1) holds.
+  </Accordion>
+  <Accordion title="What is the difference between a HashMap and a HashSet?">
+    A **HashMap** stores key-value pairs and allows you to retrieve a value by key. A **HashSet** stores only keys (values) with no associated data — it answers "does this element exist?" queries. Under the hood, most HashSet implementations are just a HashMap where the value is a constant sentinel (e.g., `true` or `1`).
+  </Accordion>
+  <Accordion title="What makes a good hash function?">
+    A good hash function should be: **deterministic** (same key always produces the same hash), **uniform** (distributes keys evenly across slots to minimize collisions), **fast** (O(1) or O(k) for key of length k), and **avalanche** (small changes in the key produce very different hashes). Cryptographic hash functions like SHA-256 are excellent hash functions but are too slow for hash tables — simpler polynomial rolling hashes are used instead.
+  </Accordion>
+  <Accordion title="How would you implement an LRU cache using a hash table?">
+    Combine a **HashMap** with a **doubly linked list**. The map keys are cache keys; the map values are pointers to nodes in the linked list. The list maintains access order — most recently used at the front, LRU at the back. On a get: find the node in O(1) via the map, move it to the front in O(1) via the list pointers. On a put: add to front and map; if over capacity, remove the tail node and its map entry. All operations are O(1).
+  </Accordion>
+  <Accordion title="Why does JavaScript's object (plain {}) behave like a hash table, and when should you use Map instead?">
+    Plain objects use string-keyed hash tables internally. However, `Map` is preferable when: (1) keys can be any type (not just strings/symbols), (2) insertion order matters (Map guarantees it), (3) you need `size` directly, (4) the map might have keys that conflict with inherited Object properties (like `constructor`, `toString`). Use plain objects only for known static shapes; use `Map` for dynamic key-value stores.
+  </Accordion>
+</AccordionGroup>

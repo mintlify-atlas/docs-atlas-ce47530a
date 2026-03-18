@@ -1,0 +1,198 @@
+---
+title: 'Deployment'
+description: 'Deploy elitecode locally, with Docker, on Kubernetes, or to Vercel.'
+---
+
+elitecode has two deployable components:
+
+- **Whisper backend** — Flask/Python, containerized via Docker, or run locally.
+- **Next.js frontend** — deployable to Vercel or any Node.js host.
+
+## Local development
+
+Running both servers locally is the recommended starting point.
+
+<Steps>
+  <Step title="Start the Whisper backend">
+    Install dependencies and start the Flask server:
+
+    ```bash
+    pip install -r requirements.txt
+    python src/python/app.py
+    ```
+
+    The backend is available at `http://localhost:8000`. Confirm it is running:
+
+    ```bash
+    curl http://localhost:8000/
+    # OK
+    ```
+  </Step>
+
+  <Step title="Configure environment variables">
+    Create `.env.local` in the project root:
+
+    ```bash .env.local
+    NEXT_PUBLIC_OPENAI_API_KEY=sk-proj-...
+    NEXT_PUBLIC_ELEVEN_API_KEY=sk_...
+    NEXT_PUBLIC_API_URL=http://localhost:8000
+    ```
+  </Step>
+
+  <Step title="Start the Next.js frontend">
+    ```bash
+    npm install
+    npm run dev
+    ```
+
+    The frontend is available at `http://localhost:3000`.
+  </Step>
+</Steps>
+
+<Note>
+The `NEXT_PUBLIC_API_URL` must point to wherever the Whisper backend is reachable from the browser. In local development both servers run on the same machine, so `http://localhost:8000` works. In production this must be the public URL of your deployed backend.
+</Note>
+
+## Docker deployment (Whisper backend)
+
+The Whisper backend ships with a `Dockerfile`. Build and run it with Docker.
+
+<Steps>
+  <Step title="Build the Docker image">
+    From the repository root:
+
+    ```bash
+    docker build -t elitecode-whisper .
+    ```
+
+    The build downloads the Whisper `base` model and bakes it into the image layer, so container startup is fast.
+  </Step>
+
+  <Step title="Run the container">
+    <CodeGroup>
+
+    ```bash Without GPU
+    docker run -p 8000:8000 elitecode-whisper
+    ```
+
+    ```bash With NVIDIA GPU
+    docker run --gpus all -p 8000:8000 elitecode-whisper
+    ```
+
+    </CodeGroup>
+
+    The backend listens on port 8000 inside the container, mapped to port 8000 on the host.
+  </Step>
+
+  <Step title="Verify the container">
+    ```bash
+    curl http://localhost:8000/
+    # OK
+    ```
+  </Step>
+</Steps>
+
+<Warning>
+To use GPU acceleration inside Docker you must install the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html) on the host machine before running the container with `--gpus all`.
+</Warning>
+
+## Kubernetes deployment (Whisper backend)
+
+A pre-built manifest at `whisper-api-deployment.yaml` deploys the Whisper backend to a Kubernetes cluster with horizontal autoscaling.
+
+The manifest creates:
+
+- A `Deployment` named `whisper-app` with 3 replicas in the `default` namespace.
+- A `HorizontalPodAutoscaler` that scales between 1 and 5 replicas based on CPU utilization, targeting 80% average utilization.
+
+<Steps>
+  <Step title="Apply the manifest">
+    ```bash
+    kubectl apply -f whisper-api-deployment.yaml
+    ```
+  </Step>
+
+  <Step title="Check rollout status">
+    ```bash
+    kubectl rollout status deployment/whisper-app
+    ```
+  </Step>
+
+  <Step title="Expose the deployment">
+    The manifest does not include a `Service`. Expose the deployment based on your cluster's ingress setup:
+
+    <CodeGroup>
+
+    ```bash LoadBalancer (cloud)
+    kubectl expose deployment whisper-app \
+      --type=LoadBalancer \
+      --port=80 \
+      --target-port=8000
+    ```
+
+    ```bash ClusterIP (internal only)
+    kubectl expose deployment whisper-app \
+      --type=ClusterIP \
+      --port=8000 \
+      --target-port=8000
+    ```
+
+    </CodeGroup>
+  </Step>
+
+  <Step title="Update NEXT_PUBLIC_API_URL">
+    Set `NEXT_PUBLIC_API_URL` to the external IP or hostname of the service, then rebuild and redeploy the frontend.
+  </Step>
+</Steps>
+
+<Info>
+The manifest references a specific image digest pinned to `gcr.io/polyglot-417619/whisper.app@sha256:570c6f...`. To deploy your own build, push the image to your registry and update the `image` field in the manifest.
+</Info>
+
+## Deploying the frontend to Vercel
+
+The Next.js frontend can be deployed to Vercel with no additional configuration. The `package.json` scripts map directly to Vercel's build pipeline:
+
+| Script | Command | Purpose |
+|--------|---------|--------|
+| `build` | `next build` | Compile and bundle the app |
+| `start` | `next start` | Serve the production build |
+| `dev` | `next dev` | Local development server |
+
+<Steps>
+  <Step title="Push your code to GitHub">
+    Vercel connects to your Git repository and triggers builds automatically on push.
+  </Step>
+
+  <Step title="Import the project in Vercel">
+    Go to [vercel.com](https://vercel.com), click **Add New Project**, and import your repository. Vercel auto-detects Next.js and sets the build command to `next build`.
+  </Step>
+
+  <Step title="Set environment variables">
+    In **Project Settings → Environment Variables**, add the three required variables:
+
+    | Variable | Example value |
+    |----------|---------------|
+    | `NEXT_PUBLIC_OPENAI_API_KEY` | `sk-proj-...` |
+    | `NEXT_PUBLIC_ELEVEN_API_KEY` | `sk_...` |
+    | `NEXT_PUBLIC_API_URL` | `https://your-whisper-backend.example.com` |
+
+    <Warning>
+    `NEXT_PUBLIC_API_URL` must be the **public URL** of your deployed Whisper backend — not `localhost`. The frontend runs in users' browsers, so it must be able to reach this URL from outside your network.
+    </Warning>
+  </Step>
+
+  <Step title="Deploy">
+    Click **Deploy**. Vercel runs `next build`, inlines the environment variables into the bundle, and serves the app from its global CDN.
+  </Step>
+</Steps>
+
+## Required environment variables for production
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `NEXT_PUBLIC_OPENAI_API_KEY` | Yes | OpenAI API key for GPT-3.5-turbo feedback |
+| `NEXT_PUBLIC_ELEVEN_API_KEY` | Yes | ElevenLabs API key for text-to-speech |
+| `NEXT_PUBLIC_API_URL` | Yes | Public URL of the deployed Whisper backend |
+
+See [Environment variables](/self-hosting/environment-variables) for full details on each variable.

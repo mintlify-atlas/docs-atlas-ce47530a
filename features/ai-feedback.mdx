@@ -1,0 +1,176 @@
+---
+title: "AI feedback"
+description: "How elitecode transcribes your voice with Whisper and evaluates your DSA explanation with GPT-3.5-turbo."
+---
+
+After you stop recording, elitecode runs your audio through a two-stage AI pipeline: Whisper converts speech to text, and GPT-3.5-turbo evaluates whether your explanation is correct and complete. Both stages happen automatically before feedback is spoken back to you.
+
+## Stage 1: Whisper transcription
+
+The audio blob is uploaded as `multipart/form-data` to the Whisper Flask backend at `NEXT_PUBLIC_API_URL/whisper`:
+
+```typescript src/components/ModulePopup.tsx
+const uploadAudio = async (blob: Blob) => {
+  setIsLoading(true);
+  const formData = new FormData();
+  formData.append("audio", blob, "audio.webm");
+
+  const response = await fetch(
+    `${process.env.NEXT_PUBLIC_API_URL}/whisper`,
+    {
+      method: "POST",
+      body: formData,
+    }
+  );
+
+  const result = await response.json();
+  const text =
+    result?.results?.[0]?.transcript ??
+    "Could not hear user, prompt an error message.";
+};
+```
+
+The Flask backend receives the upload, saves it to a temporary file, and runs Whisper's `transcribe` method:
+
+```python src/python/app.py
+from flask import Flask, abort, request
+from flask_cors import CORS
+from tempfile import NamedTemporaryFile
+import whisper
+import torch
+
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+model = whisper.load_model("base", device=DEVICE)
+
+@app.route('/whisper', methods=['POST'])
+def whisper_handler():
+    if not request.files:
+        abort(400)
+
+    results = []
+    for filename, handle in request.files.items():
+        temp = NamedTemporaryFile()
+        handle.save(temp)
+        result = model.transcribe(temp.name)
+        results.append({
+            'filename': filename,
+            'transcript': result['text'],
+        })
+
+    return {'results': results}
+```
+
+The response shape is:
+
+```json
+{
+  "results": [
+    {
+      "filename": "audio",
+      "transcript": "A linked list is a sequence of nodes where each node..."
+    }
+  ]
+}
+```
+
+The transcript is extracted from `results[0].transcript`. If the field is missing or the array is empty, a fallback string is used.
+
+<Note>
+  Whisper runs on GPU when an NVIDIA CUDA device is available, falling back to CPU automatically. The `base` model balances accuracy and speed for short explanations. See [self-hosting/whisper-backend](/self-hosting/whisper-backend) for deployment details.
+</Note>
+
+## Stage 2: GPT-3.5-turbo evaluation
+
+The transcript is passed to `getOpenAiResponse`, which calls the OpenAI Chat Completions API:
+
+```typescript src/pages/api/openai.ts
+import OpenAI from 'openai';
+
+const openai = new OpenAI({
+  apiKey: process.env.NEXT_PUBLIC_OPENAI_API_KEY || '',
+  dangerouslyAllowBrowser: true,
+});
+
+async function getOpenAiResponse(prompt: string): Promise<string> {
+  const openAiResponse = await openai.chat.completions.create({
+    messages: [{
+      role: 'user',
+      content: "The user is explaining this topic, explain if it is a good explanation or not:" + prompt
+    }],
+    model: 'gpt-3.5-turbo',
+    max_tokens: 50,
+  });
+
+  return openAiResponse.choices[0].message.content ?? '';
+}
+
+export default getOpenAiResponse;
+```
+
+### The evaluation prompt
+
+The prompt sent to GPT-3.5-turbo is:
+
+```
+The user is explaining this topic, explain if it is a good explanation or not: {transcript}
+```
+
+The model is not told which specific topic the user was explaining. It infers the subject from the explanation itself and assesses whether the explanation is accurate and complete.
+
+### What the AI evaluates
+
+GPT-3.5-turbo assesses two dimensions:
+
+| Dimension | What it checks |
+|---|---|
+| **Correctness** | Whether the facts in the explanation are accurate — correct terminology, accurate description of behavior, no conceptual errors |
+| **Completeness** | Whether the explanation covers the key aspects of the concept — definition, internal mechanism, typical use cases |
+
+A response might say: *"Good explanation! You correctly described how nodes connect via pointers, but you didn't mention the difference between singly and doubly linked lists."*
+
+### Response format
+
+| Property | Value |
+|---|---|
+| Model | `gpt-3.5-turbo` |
+| `max_tokens` | `50` |
+| Role | `user` |
+| Output | Plain text string, returned from `choices[0].message.content` |
+
+The 50-token limit keeps feedback concise — typically one or two sentences. This is intentional: the feedback is spoken aloud via TTS, so brevity matters.
+
+<Warning>
+  `dangerouslyAllowBrowser: true` is set on the OpenAI client, which means the API key is exposed in the browser. This is acceptable for local development and demos but should not be used in a production deployment with a publicly exposed key. Move the OpenAI call to a server-side API route for production use.
+</Warning>
+
+## Full pipeline call in ChatCard
+
+Both stages are called sequentially in `uploadAudio` inside `ChatCard`:
+
+```typescript src/components/ModulePopup.tsx
+// 1. Transcribe
+const result = await response.json();
+const text = result?.results?.[0]?.transcript ?? "Could not hear user";
+
+// 2. Evaluate
+const openAIResponse = await getOpenAiResponse(text);
+
+// 3. Convert to speech (see text-to-speech page)
+const ttsResponse = await textToSpeech(openAIResponse);
+```
+
+If any step throws, the `catch` block logs the error and `setIsLoading(false)` is called in the `finally` block so the modal returns to its interactive state.
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Voice recorder" icon="microphone" href="/features/voice-recorder">
+    How audio is captured before transcription.
+  </Card>
+  <Card title="Text-to-speech" icon="volume" href="/features/text-to-speech">
+    How the feedback text is converted to spoken audio.
+  </Card>
+  <Card title="Whisper backend" icon="server" href="/self-hosting/whisper-backend">
+    How to deploy the Flask transcription server.
+  </Card>
+</CardGroup>

@@ -1,0 +1,178 @@
+---
+title: "Topics"
+description: "All nine DSA topics available in elitecode, with guidance on what a complete Feynman-style explanation should cover."
+---
+
+elitecode covers nine data structures and algorithm categories drawn from the core curriculum of technical interview preparation. Each topic appears as a card on the homepage. Clicking a card opens the practice modal and prompts you to explain that topic aloud.
+
+<Info>
+  These topics are defined in the `items` array in `src/components/ui/Homepage.tsx`. The title from each item is passed directly to the `ChatCard` modal as the `topic` prop and used in the prompt: **"Explain to me what [topic] is."**
+</Info>
+
+## Data structures
+
+<AccordionGroup>
+  <Accordion title="Array">
+    **Description:** Contiguous memory storage for elements, usually of the same type.
+
+    An array stores elements in a fixed block of memory where each element occupies the same number of bytes. Because elements are adjacent, any element can be accessed in O(1) time by calculating its offset from the start address.
+
+    **What a complete explanation should cover:**
+    - Memory is laid out contiguously — elements sit next to each other
+    - Index-based access is O(1) because the address of any element is `base_address + index * element_size`
+    - Insertion and deletion in the middle are O(n) because elements must shift
+    - Static arrays have a fixed size; dynamic arrays (like JavaScript's `Array` or C++'s `vector`) resize by allocating a new block and copying
+    - Common use cases: lookup tables, buffers, representing matrices
+  </Accordion>
+
+  <Accordion title="Linked list">
+    **Description:** Series of connected nodes, each containing data.
+
+    A linked list stores elements in nodes scattered across memory. Each node holds a value and a pointer to the next node (singly linked) or pointers to both the next and previous nodes (doubly linked). There is no index-based access — traversal always starts from the head.
+
+    **What a complete explanation should cover:**
+    - Nodes are not contiguous in memory; they are connected via pointers
+    - Access to the nth element is O(n) — you must traverse from the head
+    - Insertion and deletion at a known position are O(1) — only pointers change
+    - Singly linked lists have a `next` pointer; doubly linked lists have both `next` and `prev`
+    - Trade-off vs. array: faster insertions/deletions, but no random access and extra memory for pointers
+    - Common use cases: implementing stacks, queues, and LRU caches
+  </Accordion>
+
+  <Accordion title="Graph">
+    **Description:** Collection of nodes connected by edges.
+
+    A graph is a general-purpose structure for modeling relationships. Nodes (vertices) represent entities; edges represent connections between them. Edges can be directed or undirected, and weighted or unweighted.
+
+    **What a complete explanation should cover:**
+    - Vertices and edges — the two fundamental components
+    - Directed vs. undirected: whether edges have a direction
+    - Weighted vs. unweighted: whether edges carry a cost or distance
+    - Representation: adjacency list (space-efficient for sparse graphs) vs. adjacency matrix (O(1) edge lookup, O(V²) space)
+    - Common traversals: BFS (shortest path in unweighted graphs) and DFS (cycle detection, topological sort)
+    - Common use cases: social networks, routing, dependency resolution
+  </Accordion>
+
+  <Accordion title="Tree">
+    **Description:** Hierarchical data structure with a root and branches.
+
+    A tree is a connected, acyclic graph. It has a single root node, and every other node has exactly one parent. Trees are used wherever hierarchy or nesting naturally exists.
+
+    **What a complete explanation should cover:**
+    - Root, parent, child, leaf — the key vocabulary
+    - A binary tree has at most two children per node
+    - A binary search tree (BST) keeps the left subtree smaller and right subtree larger, enabling O(log n) search, insert, and delete on average
+    - Tree traversals: in-order, pre-order, post-order, and level-order (BFS)
+    - Height vs. depth; balanced vs. unbalanced trees
+    - Common use cases: file systems, expression parsing, priority queues (heap), databases (B-tree)
+  </Accordion>
+
+  <Accordion title="Hash table">
+    **Description:** Data structure that maps keys to values.
+
+    A hash table converts a key into an array index using a hash function, then stores the value at that index. This enables average O(1) lookup, insertion, and deletion.
+
+    **What a complete explanation should cover:**
+    - A hash function converts a key to an integer index
+    - Collisions occur when two keys hash to the same index
+    - Collision resolution: separate chaining (each bucket holds a linked list) vs. open addressing (probe for the next empty slot)
+    - Average-case O(1) operations; worst-case O(n) when all keys collide
+    - Load factor: the ratio of entries to buckets; rehashing occurs when this exceeds a threshold
+    - Common use cases: dictionaries, caching, frequency counting, sets
+  </Accordion>
+
+  <Accordion title="Heap">
+    **Description:** Binary tree with a specific ordering property.
+
+    A heap is a complete binary tree where each node satisfies the heap property. In a max-heap, every parent is greater than or equal to its children. In a min-heap, every parent is less than or equal to its children. Heaps are typically stored as arrays.
+
+    **What a complete explanation should cover:**
+    - The heap property: max-heap vs. min-heap
+    - A heap is a complete binary tree — all levels are fully filled except possibly the last, which is filled left to right
+    - Array representation: the parent of node `i` is at `(i-1)/2`; children are at `2i+1` and `2i+2`
+    - `insert` is O(log n) — add to the end and bubble up
+    - `extract-max` / `extract-min` is O(log n) — swap root with last element and heapify down
+    - `peek` (read the max/min) is O(1)
+    - Common use cases: priority queues, heap sort, Dijkstra's algorithm
+  </Accordion>
+
+  <Accordion title="FIFO / LIFO data structures">
+    **Description:** Queue (FIFO) and stack (LIFO).
+
+    A queue follows First In, First Out: the first element added is the first removed. A stack follows Last In, First Out: the last element added is the first removed. Both are abstract data types that can be implemented with arrays or linked lists.
+
+    **What a complete explanation should cover:**
+    - Queue: enqueue adds to the back, dequeue removes from the front — FIFO
+    - Stack: push adds to the top, pop removes from the top — LIFO
+    - Why FIFO matters: order is preserved — useful for processing tasks in the order they arrive
+    - Why LIFO matters: last action is undone first — useful for function call stacks, undo systems, parsing
+    - Common queue implementations: circular buffer, linked list
+    - Common stack implementations: dynamic array, linked list
+    - Common use cases: queue for BFS, task scheduling; stack for DFS, expression evaluation, call stack
+  </Accordion>
+</AccordionGroup>
+
+## Algorithms
+
+<AccordionGroup>
+  <Accordion title="Searching algorithms">
+    **Description:** Finding elements in a list efficiently.
+
+    Searching algorithms locate a target value within a data structure. The right algorithm depends on whether the data is sorted and how much time and space you can afford.
+
+    **What a complete explanation should cover:**
+    - **Linear search**: check each element one by one — O(n) time, works on unsorted data
+    - **Binary search**: repeatedly halve the search space — O(log n) time, requires sorted data
+    - The key insight of binary search: comparing the middle element tells you which half to discard
+    - Binary search requires random access (arrays), not just sequential traversal
+    - Trade-off: linear search is simple and works anywhere; binary search is faster but requires a sorted, randomly-accessible structure
+    - Common use cases: finding a value in a sorted array, searching a sorted database index
+  </Accordion>
+
+  <Accordion title="Sorting algorithms">
+    **Description:** Techniques to get a collection of elements in order.
+
+    Sorting algorithms rearrange elements in a defined order, typically ascending. They differ in time complexity, space complexity, stability, and whether they work in place.
+
+    **What a complete explanation should cover:**
+    - **O(n²) algorithms**: bubble sort, insertion sort, selection sort — simple but slow for large inputs
+    - **O(n log n) algorithms**: merge sort, quick sort, heap sort — efficient for large inputs
+    - **Linear-time algorithms**: counting sort, bucket sort — O(n) but require constraints on the input (limited range or uniform distribution)
+    - Stability: a stable sort preserves the relative order of equal elements
+    - In-place vs. not: merge sort requires O(n) extra space; quick sort is in-place on average
+    - Quick sort's worst case is O(n²) with a bad pivot; random pivot selection or median-of-three reduces this in practice
+    - Common use cases: preparing data for binary search, ranking, deduplication
+  </Accordion>
+</AccordionGroup>
+
+## All topics at a glance
+
+<CardGroup cols={3}>
+  <Card title="Array" icon="table" href="/features/topics">
+    Contiguous memory, O(1) access, O(n) insertion
+  </Card>
+  <Card title="Searching algorithms" icon="magnifying-glass" href="/features/topics">
+    Linear search and binary search
+  </Card>
+  <Card title="Sorting algorithms" icon="arrow-down-wide-short" href="/features/topics">
+    O(n²), O(n log n), and linear-time sorts
+  </Card>
+  <Card title="Linked list" icon="link" href="/features/topics">
+    Pointer-connected nodes, O(n) access, O(1) insert
+  </Card>
+  <Card title="Graph" icon="diagram-project" href="/features/topics">
+    Vertices, edges, BFS, DFS
+  </Card>
+  <Card title="FIFO / LIFO" icon="layer-group" href="/features/topics">
+    Queue (FIFO) and stack (LIFO)
+  </Card>
+  <Card title="Tree" icon="sitemap" href="/features/topics">
+    Hierarchical, root, BST, traversals
+  </Card>
+  <Card title="Hash table" icon="hashtag" href="/features/topics">
+    Hash function, O(1) average, collision resolution
+  </Card>
+  <Card title="Heap" icon="triangle" href="/features/topics">
+    Complete binary tree, min/max property, priority queue
+  </Card>
+</CardGroup>

@@ -1,0 +1,196 @@
+---
+title: Linked List
+description: A series of connected nodes where each node holds a value and a pointer to the next node. Enables efficient insertions and deletions without shifting elements.
+---
+
+A linked list is a linear data structure made up of **nodes**. Each node contains two things: a **value** (the data you care about) and a **pointer** (a reference to the next node in the sequence). The last node's pointer is `null`, signaling the end of the list.
+
+Unlike arrays, linked list nodes are **not stored contiguously in memory** — they can be scattered anywhere on the heap, connected only by their pointers.
+
+<Note>
+  The source code in elitecode shows both **singly linked** and **doubly linked** variants. A singly linked list has one `next` pointer per node. A doubly linked list also has a `prev` pointer, allowing traversal in both directions.
+</Note>
+
+## Singly vs doubly linked list
+
+| Feature              | Singly linked      | Doubly linked             |
+|----------------------|--------------------|---------------------------|
+| Pointers per node    | 1 (`next`)         | 2 (`next` + `prev`)       |
+| Memory per node      | Less               | More                      |
+| Traverse backwards   | No                 | Yes                       |
+| Delete a node (given ref) | O(n) — need prev | O(1) — have prev pointer |
+| Common use cases     | Stacks, simple lists | Deques, LRU cache         |
+
+## Time and space complexity
+
+| Operation            | Singly linked | Doubly linked | Notes                          |
+|----------------------|---------------|---------------|--------------------------------|
+| Access by index      | O(n)          | O(n)          | Must traverse from head        |
+| Search               | O(n)          | O(n)          | Must traverse                  |
+| Insert at head       | O(1)          | O(1)          | Just update head pointer       |
+| Insert at tail       | O(n)          | O(1)*         | *O(1) with a tail pointer      |
+| Insert in middle     | O(n)          | O(n)          | O(n) to find position          |
+| Delete at head       | O(1)          | O(1)          | Update head to head.next       |
+| Delete (given node)  | O(n)          | O(1)          | Singly needs to find prev node |
+
+**Space complexity**: O(n) for n nodes.
+
+## TypeScript code examples
+
+```typescript
+// Node definition
+class ListNode<T> {
+  value: T;
+  next: ListNode<T> | null;
+
+  constructor(value: T) {
+    this.value = value;
+    this.next = null;
+  }
+}
+
+// Singly linked list
+class LinkedList<T> {
+  head: ListNode<T> | null = null;
+
+  // Insert at tail — O(n)
+  append(value: T): void {
+    const node = new ListNode(value);
+    if (!this.head) {
+      this.head = node;
+      return;
+    }
+    let current = this.head;
+    while (current.next) {
+      current = current.next;
+    }
+    current.next = node;
+  }
+
+  // Insert at head — O(1)
+  prepend(value: T): void {
+    const node = new ListNode(value);
+    node.next = this.head;
+    this.head = node;
+  }
+
+  // Delete first occurrence of value — O(n)
+  delete(value: T): void {
+    if (!this.head) return;
+    if (this.head.value === value) {
+      this.head = this.head.next;
+      return;
+    }
+    let current = this.head;
+    while (current.next) {
+      if (current.next.value === value) {
+        current.next = current.next.next;
+        return;
+      }
+      current = current.next;
+    }
+  }
+
+  // Print all values — O(n)
+  print(): void {
+    const values: T[] = [];
+    let current = this.head;
+    while (current) {
+      values.push(current.value);
+      current = current.next;
+    }
+    console.log(values.join(' -> '));
+  }
+}
+
+// Reverse a singly linked list — O(n) time, O(1) space
+function reverseList<T>(head: ListNode<T> | null): ListNode<T> | null {
+  let prev: ListNode<T> | null = null;
+  let current = head;
+  while (current) {
+    const next = current.next;
+    current.next = prev;
+    prev = current;
+    current = next;
+  }
+  return prev; // new head
+}
+
+// Detect a cycle — Floyd's fast/slow pointer — O(n) time, O(1) space
+function hasCycle<T>(head: ListNode<T> | null): boolean {
+  let slow = head;
+  let fast = head;
+  while (fast && fast.next) {
+    slow = slow!.next;
+    fast = fast.next.next;
+    if (slow === fast) return true;
+  }
+  return false;
+}
+```
+
+## Common interview patterns
+
+<CardGroup cols={2}>
+  <Card title="Fast and slow pointers" icon="gauge">
+    Use two pointers where `fast` moves two nodes at a time and `slow` moves one. When `fast` reaches the end, `slow` is at the midpoint. If there's a cycle, they'll eventually meet. Useful for: cycle detection, finding the middle, finding the kth node from the end.
+  </Card>
+  <Card title="Reverse a linked list" icon="rotate-left">
+    Iterate with three pointers: `prev`, `current`, `next`. At each step, point `current.next` backward to `prev`, then advance all three. In-place, O(n) time, O(1) space. The foundation for many harder problems.
+  </Card>
+</CardGroup>
+
+<Tip>
+  Many linked list problems become much easier when you add a **dummy head node** — a sentinel node before the real head. It eliminates the special case of operating on the first node.
+</Tip>
+
+## Common use cases
+
+- **Implementing stacks and queues**: Push/pop at the head for a stack; append at tail and remove at head for a queue.
+- **LRU cache**: A doubly linked list combined with a hash map gives O(1) access, insertion, and deletion — the exact requirements for a Least Recently Used cache.
+- **Undo/redo systems**: Each action is a node; undo walks backward (doubly linked).
+- **Adjacency lists for graphs**: Each vertex's neighbors can be stored as a linked list.
+
+## How to explain it in elitecode
+
+When practicing, structure your explanation around contrast with arrays:
+
+**Start with the core idea:**
+> "A linked list is a chain of nodes. Each node holds a value and a pointer to the next node. The nodes aren't stored next to each other in memory — they're connected only through those pointers."
+
+**Contrast with arrays:**
+> "Unlike an array, I can't jump directly to index 5 — I have to start at the head and follow the chain, which is O(n). But inserting at the head is O(1) because I just point my new node at the old head and update the head reference — no shifting required."
+
+**Explain the two variants:**
+> "A singly linked list has one `next` pointer per node. A doubly linked list also has a `prev` pointer, so I can traverse both directions. Doubly linked lists use more memory but make deletion O(1) if I already have a reference to the node, because I can access the previous node directly."
+
+**Close with a common interview problem:**
+> "A classic problem is detecting a cycle. You use Floyd's algorithm — two pointers, one moving twice as fast. If there's a cycle, the fast pointer laps the slow one and they meet. If there's no cycle, the fast pointer hits null."
+
+<Warning>
+  A common mistake is forgetting to handle the edge cases: empty list (`head === null`), single-node list, and the last node having `next === null`. Always check these in your explanation.
+</Warning>
+
+## Common interview questions
+
+<AccordionGroup>
+  <Accordion title="How do you find the middle of a linked list in one pass?">
+    Use the fast/slow pointer technique. Initialize both at the head. Move `slow` one node at a time and `fast` two nodes at a time. When `fast` reaches the end (either `fast === null` or `fast.next === null`), `slow` is at the middle. This works in O(n) time with O(1) extra space — no need to count nodes first.
+  </Accordion>
+  <Accordion title="How do you detect and find the start of a cycle?">
+    First detect using Floyd's algorithm — if `slow` and `fast` meet, there's a cycle. To find the cycle's start: reset one pointer to the head, keep the other at the meeting point. Move both one step at a time. Where they meet again is the start of the cycle. This is a mathematical property of the algorithm.
+  </Accordion>
+  <Accordion title="How do you reverse a linked list iteratively vs recursively?">
+    **Iteratively**: Maintain three pointers (`prev = null`, `curr = head`, `next`). Loop: save `curr.next`, point `curr.next` to `prev`, advance `prev` to `curr`, advance `curr` to saved next. Return `prev`. Time O(n), space O(1).
+
+    **Recursively**: The base case is `head === null || head.next === null`, return `head`. Recurse on `head.next` to get the new head, then set `head.next.next = head` and `head.next = null`. Time O(n), space O(n) for the call stack.
+
+    Prefer the iterative approach in interviews — it uses O(1) space.
+  </Accordion>
+  <Accordion title="What is a dummy/sentinel node and why is it useful?">
+    A sentinel node is a fake node placed before the real head with a placeholder value. It eliminates special-casing the head node: operations like "delete the first node" become identical to "delete any node" because `sentinel.next` always points to the real head. It simplifies code and reduces bugs.
+  </Accordion>
+  <Accordion title="How would you implement an LRU cache using a linked list?">
+    Combine a **doubly linked list** with a **hash map**. The list maintains order — most recently used at the front, least recently used at the back. The hash map maps keys to their nodes for O(1) access. On a cache hit: remove the node from its current position (O(1) with `prev`/`next` pointers) and move it to the front. On eviction: remove the node at the back. All operations are O(1).
+  </Accordion>
+</AccordionGroup>

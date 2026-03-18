@@ -1,0 +1,211 @@
+---
+title: Tree
+description: A hierarchical data structure with a root node and branches of parent-child relationships. Binary search trees enable O(log n) search, insert, and delete on sorted data.
+---
+
+A tree is a hierarchical data structure made of **nodes** connected by **edges**. Unlike a linked list (which is linear), a tree branches — each node can have multiple children. Trees model any naturally hierarchical system: file directories, the HTML DOM, organization charts, and decision trees.
+
+## Key terminology
+
+- **Root**: The top-most node with no parent.
+- **Leaf**: A node with no children.
+- **Height of a node**: The number of edges on the longest path from that node to a leaf.
+- **Depth of a node**: The number of edges from the root to that node.
+- **Subtree**: A node and all of its descendants.
+- **Balanced tree**: A tree where the height difference between the left and right subtrees of every node is at most 1.
+
+## Binary tree vs binary search tree (BST)
+
+| Property                  | Binary tree                     | Binary Search Tree (BST)                        |
+|---------------------------|---------------------------------|-------------------------------------------------|
+| Children per node         | At most 2 (left, right)         | At most 2 (left, right)                         |
+| Ordering constraint       | None                            | `left < node < right` at every node             |
+| Search                    | O(n) — must traverse all        | O(log n) average, O(n) worst (degenerate)        |
+| Insert                    | O(n) if maintaining order       | O(log n) average                                |
+| In-order traversal        | Arbitrary order                 | Yields elements in sorted ascending order       |
+
+<Warning>
+  A BST degenerates to O(n) for search and insert when elements are inserted in sorted order — the tree becomes a linked list. Self-balancing trees (AVL, Red-Black) prevent this, but they are rarely required to implement from scratch in interviews.
+</Warning>
+
+## Time and space complexity
+
+| Operation       | BST Average | BST Worst | Notes                                      |
+|-----------------|-------------|-----------|--------------------------------------------|
+| Search          | O(log n)    | O(n)      | Worst case: degenerate (unbalanced) tree   |
+| Insert          | O(log n)    | O(n)      | Same reasoning                             |
+| Delete          | O(log n)    | O(n)      | Replace with in-order successor/predecessor|
+| Traversal       | O(n)        | O(n)      | Must visit every node                      |
+| Height          | O(n)        | O(n)      | Recursive call on every node               |
+
+**Space complexity**: O(n) for n nodes. Recursive traversal uses O(h) call stack space where h is the height.
+
+## Tree traversals
+
+There are four standard traversal orders, each with different use cases:
+
+| Traversal      | Order                          | Use case                                    |
+|----------------|--------------------------------|---------------------------------------------|
+| In-order       | Left → Node → Right            | Prints BST keys in sorted order             |
+| Pre-order      | Node → Left → Right            | Serialize/copy a tree                        |
+| Post-order     | Left → Right → Node            | Delete a tree, evaluate expression trees    |
+| Level-order (BFS) | Level by level, left to right | Shortest path, level-based problems      |
+
+## TypeScript code examples
+
+```typescript
+// Tree node definition
+class TreeNode {
+  value: number;
+  left: TreeNode | null;
+  right: TreeNode | null;
+
+  constructor(value: number) {
+    this.value = value;
+    this.left = null;
+    this.right = null;
+  }
+}
+
+// Binary Search Tree
+class BST {
+  root: TreeNode | null = null;
+
+  // Insert — O(log n) average
+  insert(value: number): void {
+    this.root = this._insert(this.root, value);
+  }
+
+  private _insert(node: TreeNode | null, value: number): TreeNode {
+    if (!node) return new TreeNode(value);
+    if (value < node.value) node.left = this._insert(node.left, value);
+    else if (value > node.value) node.right = this._insert(node.right, value);
+    return node; // duplicate: ignore
+  }
+
+  // Search — O(log n) average
+  search(value: number): boolean {
+    let current = this.root;
+    while (current) {
+      if (value === current.value) return true;
+      current = value < current.value ? current.left : current.right;
+    }
+    return false;
+  }
+}
+
+// In-order traversal (sorted output for BST) — O(n)
+function inOrder(node: TreeNode | null): number[] {
+  if (!node) return [];
+  return [...inOrder(node.left), node.value, ...inOrder(node.right)];
+}
+
+// Pre-order traversal — O(n)
+function preOrder(node: TreeNode | null): number[] {
+  if (!node) return [];
+  return [node.value, ...preOrder(node.left), ...preOrder(node.right)];
+}
+
+// Post-order traversal — O(n)
+function postOrder(node: TreeNode | null): number[] {
+  if (!node) return [];
+  return [...postOrder(node.left), ...postOrder(node.right), node.value];
+}
+
+// Level-order traversal (BFS) — O(n)
+function levelOrder(root: TreeNode | null): number[][] {
+  if (!root) return [];
+  const result: number[][] = [];
+  const queue: TreeNode[] = [root];
+  while (queue.length > 0) {
+    const levelSize = queue.length;
+    const level: number[] = [];
+    for (let i = 0; i < levelSize; i++) {
+      const node = queue.shift()!;
+      level.push(node.value);
+      if (node.left) queue.push(node.left);
+      if (node.right) queue.push(node.right);
+    }
+    result.push(level);
+  }
+  return result;
+}
+
+// Height of a tree — O(n)
+function height(node: TreeNode | null): number {
+  if (!node) return -1; // or 0 depending on definition
+  return 1 + Math.max(height(node.left), height(node.right));
+}
+
+// Lowest Common Ancestor in BST — O(log n)
+function lcaBST(root: TreeNode, p: number, q: number): TreeNode {
+  if (p < root.value && q < root.value) return lcaBST(root.left!, p, q);
+  if (p > root.value && q > root.value) return lcaBST(root.right!, p, q);
+  return root; // root is the split point
+}
+```
+
+## Common interview patterns
+
+<CardGroup cols={3}>
+  <Card title="DFS traversals" icon="arrow-down">
+    Recursively visit left and right subtrees. The order (pre/in/post) determines what you do with the current node relative to the recursive calls. Most tree problems reduce to a DFS with a carefully chosen return value.
+  </Card>
+  <Card title="Height and depth" icon="ruler">
+    Many problems ask about the height (max depth to a leaf) or the diameter (longest path through any node). The trick is returning height from a recursive call and computing the diameter as a side effect.
+  </Card>
+  <Card title="Lowest common ancestor" icon="code-branch">
+    In a BST, LCA is the node where `p` and `q` split to different sides. In a general binary tree, use DFS and return the node when you find either target — if both subtrees return non-null, the current node is the LCA.
+  </Card>
+</CardGroup>
+
+<Tip>
+  For most recursive tree problems, ask yourself: "What should this function return for a given node, and what do I do with the left and right return values?" Getting the return type right simplifies the code dramatically.
+</Tip>
+
+## Common use cases
+
+- **File systems**: Directories are nodes; files and subdirectories are children.
+- **HTML/XML DOM**: Every element is a tree node; nesting is the parent-child relationship.
+- **Expression trees**: Operators are internal nodes; operands are leaves. Post-order traversal evaluates the expression.
+- **Decision trees and tries**: Prefix trees (tries) use trees to store strings for O(L) lookup where L is string length.
+
+## How to explain it in elitecode
+
+**Start with the structure:**
+> "A tree is a hierarchical data structure. It has a root at the top, internal nodes that form branches, and leaf nodes at the bottom with no children. In a binary tree, each node has at most two children: left and right."
+
+**Distinguish BST:**
+> "A binary search tree adds an ordering property: for any node, everything in its left subtree is smaller and everything in its right subtree is larger. This lets me search, insert, and delete in O(log n) on average — I eliminate half the remaining nodes at each step, just like binary search on an array."
+
+**Walk through traversals:**
+> "There are four common traversal orders. In-order visits left, then the current node, then right — for a BST this gives you sorted output. Pre-order visits the node first — useful for copying or serializing the tree. Post-order visits the node last — useful for deleting or evaluating an expression tree. Level-order uses a queue to visit nodes level by level."
+
+**Close with the recursion pattern:**
+> "Almost every tree problem is solved with recursion. The key is deciding what the base case is (usually `null` returns some identity value like 0, -1, or null) and what the function returns — which the parent node uses to compute its own result."
+
+<Warning>
+  Always mention the worst case for BST operations. A BST built by inserting sorted data becomes a straight line (degenerate tree), degrading to O(n). This is why self-balancing BSTs like AVL trees and Red-Black trees exist.
+</Warning>
+
+## Common interview questions
+
+<AccordionGroup>
+  <Accordion title="What is the difference between a binary tree and a binary search tree?">
+    A **binary tree** is any tree where each node has at most two children. There is no constraint on the ordering of values. A **binary search tree** is a binary tree with the additional invariant: for every node, all values in the left subtree are strictly less than the node's value, and all values in the right subtree are strictly greater. This invariant enables O(log n) average-case search, insert, and delete, and means an in-order traversal always yields values in sorted order.
+  </Accordion>
+  <Accordion title="How do you check if a binary tree is balanced?">
+    A tree is balanced if, for every node, the heights of its left and right subtrees differ by at most 1. The efficient approach is a bottom-up DFS: write a helper that returns the height of a subtree, but returns -1 (or throws a sentinel) if any subtree along the way is unbalanced. This is O(n) — each node is visited once. The naive top-down approach recomputes heights repeatedly and is O(n log n) or O(n²).
+  </Accordion>
+  <Accordion title="What is the difference between DFS and BFS on a tree, and when do you use each?">
+    **DFS** (depth-first search) goes as deep as possible before backtracking. Implemented with recursion or an explicit stack. Best when you need to explore a full path from root to leaf, compute heights/depths, or detect paths with a specific property.
+
+    **BFS** (breadth-first search) visits all nodes at the current depth before going deeper. Implemented with a queue. Best when you need the shortest path, the minimum depth, or need to process nodes level by level.
+  </Accordion>
+  <Accordion title="How do you serialize and deserialize a binary tree?">
+    Use pre-order traversal. During serialization, write each node's value; write a sentinel (e.g., `"#"`) for null children. This produces a string like `"1,2,#,#,3,#,#"`. During deserialization, split on the delimiter and process tokens with a recursive function that consumes one token per call — it reconstructs the exact tree structure because pre-order always gives the root before its children.
+  </Accordion>
+  <Accordion title="What is the diameter of a binary tree and how do you compute it?">
+    The diameter is the length of the longest path between any two nodes (measured in number of edges). The path may or may not pass through the root. Compute it with a DFS: at each node, the longest path through that node is `left_height + right_height`. Track the global maximum across all nodes. Return `max(left_height, right_height) + 1` up the call stack as the height. This is O(n) in a single pass.
+  </Accordion>
+</AccordionGroup>

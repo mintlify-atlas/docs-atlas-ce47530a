@@ -1,0 +1,230 @@
+---
+title: 'Whisper backend'
+description: 'Set up and run the Flask/Whisper transcription backend locally or with Docker.'
+---
+
+The Whisper backend is a Python Flask application that loads OpenAI's Whisper `base` model and exposes an HTTP endpoint for audio transcription. It automatically uses a CUDA GPU when one is available, and falls back to CPU otherwise.
+
+## Endpoints
+
+### `GET /`
+
+Health check. Returns the string `OK` with HTTP 200. Use this to verify the backend is running.
+
+### `POST /whisper`
+
+Accepts one or more audio files and returns transcriptions.
+
+**Request**
+
+<ParamField path="body" type="multipart/form-data" required>
+  One or more audio files. Each file is keyed by its filename in the form data. Whisper supports a wide range of audio formats (mp3, wav, m4a, webm, ogg, and others) via ffmpeg.
+</ParamField>
+
+**Response**
+
+```json
+{
+  "results": [
+    {
+      "filename": "recording.webm",
+      "transcript": "The quick brown fox jumps over the lazy dog."
+    }
+  ]
+}
+```
+
+<ResponseField name="results" type="object[]" required>
+  Array of transcription results, one per uploaded file.
+  <Expandable title="result object">
+    <ResponseField name="filename" type="string" required>
+      The key name used for the file in the multipart form data.
+    </ResponseField>
+    <ResponseField name="transcript" type="string" required>
+      The full transcribed text extracted from the audio file.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+If no files are included in the request body the endpoint returns HTTP 400.
+
+## GPU detection
+
+At startup, the application checks for CUDA availability and selects the compute device accordingly:
+
+```python src/python/app.py
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+model = whisper.load_model("base", device=DEVICE)
+```
+
+The Whisper `base` model is loaded once at startup and reused for all requests. Transcription on CPU is functional but noticeably slower for longer recordings.
+
+## Running locally
+
+<Steps>
+  <Step title="Install system dependencies">
+    Whisper requires `ffmpeg` for audio decoding. Install it before installing Python packages.
+
+    <CodeGroup>
+
+    ```bash macOS
+    brew install ffmpeg
+    ```
+
+    ```bash Ubuntu / Debian
+    sudo apt-get install ffmpeg
+    ```
+
+    </CodeGroup>
+  </Step>
+
+  <Step title="Install Python dependencies">
+    From the repository root, install the dependencies listed in `requirements.txt`.
+
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+    This installs Flask, Flask-CORS, Whisper (from the OpenAI GitHub repository), and setuptools-rust.
+
+    <Note>
+    Whisper is installed directly from the `openai/whisper` GitHub repository, not from PyPI. Ensure you have `git` available on your PATH.
+    </Note>
+  </Step>
+
+  <Step title="Run the Flask application">
+    ```bash
+    python src/python/app.py
+    ```
+
+    The server starts on port 5000 by default when run with the Flask development server. For production-equivalent local testing, use gunicorn:
+
+    ```bash
+    gunicorn -w 1 -b 0.0.0.0:8000 -t 600 src.python.app:app
+    ```
+
+    Verify it is running:
+
+    ```bash
+    curl http://localhost:8000/
+    # OK
+    ```
+  </Step>
+</Steps>
+
+## Running with Docker
+
+The provided `Dockerfile` builds a GPU-capable image based on NVIDIA's CUDA 12.2 runtime on Ubuntu 20.04.
+
+```dockerfile Dockerfile
+FROM nvidia/cuda:12.2.0-base-ubuntu20.04
+
+WORKDIR /sfhacks
+
+# Install system dependencies
+RUN apt-get update -q && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    git ffmpeg python3-pip && \
+    apt-get clean autoclean && \
+    apt-get autoremove --yes && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install gunicorn
+RUN pip3 install gunicorn
+
+# Copy and install Python dependencies
+COPY requirements.txt requirements.txt
+RUN pip3 install -r requirements.txt
+
+# Pre-download the Whisper base model during build
+RUN python3 -c 'import whisper; whisper.load_model("base", device="cpu")'
+
+# Copy application code
+COPY src/python/app.py app.py
+
+EXPOSE 8000
+
+CMD ["gunicorn", "-w", "1", "-b", "0.0.0.0:8000", "-t", "600", "app:app"]
+```
+
+Key details:
+
+- **Base image**: `nvidia/cuda:12.2.0-base-ubuntu20.04` — provides CUDA 12.2 support.
+- **Model pre-download**: The Whisper `base` model is downloaded during the image build step (`RUN python3 -c 'import whisper; whisper.load_model(...)'`), so it does not need to be fetched on container startup.
+- **Gunicorn**: Used as the production WSGI server with a 600-second worker timeout to accommodate longer audio files.
+- **Port**: The container listens on port 8000.
+
+<Steps>
+  <Step title="Build the image">
+    ```bash
+    docker build -t elitecode-whisper .
+    ```
+  </Step>
+
+  <Step title="Run without GPU">
+    ```bash
+    docker run -p 8000:8000 elitecode-whisper
+    ```
+  </Step>
+
+  <Step title="Run with NVIDIA GPU">
+    Requires the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html) installed on the host.
+
+    ```bash
+    docker run --gpus all -p 8000:8000 elitecode-whisper
+    ```
+  </Step>
+</Steps>
+
+<Tip>
+Building the image takes several minutes the first time because the Whisper model (~140 MB) is downloaded during the build. Subsequent builds use Docker's layer cache and are much faster.
+</Tip>
+
+## Kubernetes deployment
+
+A Kubernetes manifest is included at `whisper-api-deployment.yaml`. It defines a `Deployment` and a `HorizontalPodAutoscaler`.
+
+```yaml whisper-api-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: whisper-app
+  namespace: default
+  labels:
+    app: whisper-app
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: whisper-app
+  template:
+    metadata:
+      labels:
+        app: whisper-app
+    spec:
+      containers:
+      - name: whisper-app-sha256-1
+        image: gcr.io/polyglot-417619/whisper.app@sha256:570c6f0bbd62985e253f863284d6ffb7866614c78eadfbfca9107eaff4b6e4c3
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: whisper-app-hpa-oa71
+  namespace: default
+spec:
+  scaleTargetRef:
+    kind: Deployment
+    name: whisper-app
+    apiVersion: apps/v1
+  minReplicas: 1
+  maxReplicas: 5
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 80
+```
+
+The HPA scales the deployment between 1 and 5 replicas, targeting 80% average CPU utilization. See [Deployment](/self-hosting/deployment) for instructions on applying this manifest.

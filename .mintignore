@@ -5,3 +5,10 @@
 # Draft content
 drafts/
 *.draft.mdx
+
+# Legacy Mintlify starter kit files (not part of elitecode docs)
+essentials/
+api-reference/
+ai-tools/
+snippets/
+development.mdx

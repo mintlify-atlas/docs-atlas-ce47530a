@@ -1,0 +1,315 @@
+---
+title: Searching Algorithms
+description: Techniques for finding elements in a collection. Covers linear search (O(n)) and binary search (O(log n)) with TypeScript implementations, variants, and interview patterns.
+---
+
+Searching is the process of locating a specific element — or determining that it does not exist — within a collection. The two foundational approaches are **linear search** (check every element) and **binary search** (halve the search space on each step).
+
+<Note>
+  The elitecode app covers two searching algorithms: **linear search** (linear time) and **binary search** (O(log n) time). Binary search is one of the most frequently tested algorithms in technical interviews.
+</Note>
+
+## Complexity comparison
+
+| Algorithm     | Best   | Average  | Worst  | Space | Prerequisite     |
+|---------------|--------|----------|--------|-------|------------------|
+| Linear search | O(1)   | O(n)     | O(n)   | O(1)  | None             |
+| Binary search | O(1)   | O(log n) | O(log n) | O(1) | **Sorted array** |
+
+**When to use which**: Use linear search when the array is unsorted or too small to justify sorting. Use binary search when the array is sorted (or when you can sort it once and search many times).
+
+---
+
+## Linear search
+
+Linear search checks each element in sequence from left to right until it finds the target or exhausts the array. It makes no assumptions about the order of elements.
+
+**How it works** — searching for `7` in `[3, 9, 1, 7, 4]`:
+1. Compare 3 with 7 — no match. Move right.
+2. Compare 9 with 7 — no match. Move right.
+3. Compare 1 with 7 — no match. Move right.
+4. Compare 7 with 7 — match found at index 3. Return 3.
+
+If the element is not present, the search reaches the end and returns -1.
+
+**Time complexity**: O(n) average and worst case. O(1) best case (element is at index 0).
+
+**Space complexity**: O(1) — no extra memory needed.
+
+**When to use it**:
+- The array is unsorted and you cannot afford to sort it.
+- You only need to search once (sorting first would cost O(n log n), more than a single O(n) scan).
+- The array is very small (n < ~20) — constant factors dominate, and linear search is simpler.
+- You are searching a linked list or stream where random access is not available.
+
+```typescript
+// Linear search — O(n) time, O(1) space
+function linearSearch(arr: number[], target: number): number {
+  for (let i = 0; i < arr.length; i++) {
+    if (arr[i] === target) return i; // return index of first match
+  }
+  return -1; // not found
+}
+
+// Works on any type with a custom equality check
+function linearSearchBy<T>(arr: T[], predicate: (item: T) => boolean): number {
+  for (let i = 0; i < arr.length; i++) {
+    if (predicate(arr[i])) return i;
+  }
+  return -1;
+}
+
+// Example: find first person older than 30
+const people = [{ name: 'Alice', age: 25 }, { name: 'Bob', age: 35 }];
+const idx = linearSearchBy(people, (p) => p.age > 30); // 1
+```
+
+---
+
+## Binary search
+
+Binary search works on a **sorted array** by repeatedly halving the search space. It compares the target with the middle element: if they match, return the index; if the target is smaller, discard the right half; if larger, discard the left half. Each step eliminates half the remaining candidates.
+
+**How it works** — searching for `7` in `[1, 3, 4, 7, 9, 12, 15]`:
+1. `low=0`, `high=6`, `mid=3`. `arr[3]=7` — match found. Return 3.
+
+Searching for `5` in the same array:
+1. `low=0`, `high=6`, `mid=3`. `arr[3]=7 > 5` → search left half: `high=2`.
+2. `low=0`, `high=2`, `mid=1`. `arr[1]=3 < 5` → search right half: `low=2`.
+3. `low=2`, `high=2`, `mid=2`. `arr[2]=4 < 5` → `low=3 > high=2`. Not found. Return -1.
+
+**Time complexity**: O(log n) — each step halves the problem size. After log₂(n) steps, only one element remains.
+
+**Space complexity**: O(1) iterative, O(log n) recursive (call stack).
+
+<Tabs>
+  <Tab title="Iterative">
+    ```typescript
+    // Iterative binary search — O(log n) time, O(1) space
+    function binarySearch(arr: number[], target: number): number {
+      let low = 0;
+      let high = arr.length - 1;
+
+      while (low <= high) {
+        // Use bitwise shift to avoid integer overflow (important in languages with fixed integers)
+        const mid = low + Math.floor((high - low) / 2);
+
+        if (arr[mid] === target) {
+          return mid;
+        } else if (arr[mid] < target) {
+          low = mid + 1;  // target is in the right half
+        } else {
+          high = mid - 1; // target is in the left half
+        }
+      }
+
+      return -1; // not found
+    }
+    ```
+  </Tab>
+  <Tab title="Recursive">
+    ```typescript
+    // Recursive binary search — O(log n) time, O(log n) space (call stack)
+    function binarySearchRecursive(
+      arr: number[],
+      target: number,
+      low = 0,
+      high = arr.length - 1
+    ): number {
+      if (low > high) return -1; // base case: not found
+
+      const mid = low + Math.floor((high - low) / 2);
+
+      if (arr[mid] === target) return mid;
+      if (arr[mid] < target) return binarySearchRecursive(arr, target, mid + 1, high);
+      return binarySearchRecursive(arr, target, low, mid - 1);
+    }
+    ```
+  </Tab>
+</Tabs>
+
+<Warning>
+  A classic bug: writing `mid = (low + high) / 2`. In languages with 32-bit integers (Java, C), `low + high` can overflow when both values are large. The safe formula is `mid = low + Math.floor((high - low) / 2)`. JavaScript numbers are 64-bit floats, so overflow is not a practical concern, but using the safe formula is good habit.
+</Warning>
+
+---
+
+## Binary search variants
+
+The standard binary search finds *any* occurrence of the target. Many interview problems require finding the **leftmost** or **rightmost** occurrence, or searching for a condition rather than an exact value.
+
+### Find leftmost (first) occurrence
+
+When the array contains duplicates and you need the index of the first occurrence, do not stop when you find a match — record it and keep searching left.
+
+```typescript
+// Returns the index of the first occurrence of target, or -1 if not found
+function lowerBound(arr: number[], target: number): number {
+  let low = 0;
+  let high = arr.length - 1;
+  let result = -1;
+
+  while (low <= high) {
+    const mid = low + Math.floor((high - low) / 2);
+    if (arr[mid] === target) {
+      result = mid;   // record this match...
+      high = mid - 1; // ...but keep searching left
+    } else if (arr[mid] < target) {
+      low = mid + 1;
+    } else {
+      high = mid - 1;
+    }
+  }
+
+  return result;
+}
+```
+
+### Find rightmost (last) occurrence
+
+```typescript
+// Returns the index of the last occurrence of target, or -1 if not found
+function upperBound(arr: number[], target: number): number {
+  let low = 0;
+  let high = arr.length - 1;
+  let result = -1;
+
+  while (low <= high) {
+    const mid = low + Math.floor((high - low) / 2);
+    if (arr[mid] === target) {
+      result = mid;  // record this match...
+      low = mid + 1; // ...but keep searching right
+    } else if (arr[mid] < target) {
+      low = mid + 1;
+    } else {
+      high = mid - 1;
+    }
+  }
+
+  return result;
+}
+```
+
+### Search in a rotated sorted array
+
+A rotated sorted array is a sorted array that has been shifted at some pivot — e.g., `[4, 5, 6, 7, 0, 1, 2]`. You can still binary search it in O(log n) by determining which half is properly sorted on each step.
+
+```typescript
+function searchRotated(arr: number[], target: number): number {
+  let low = 0;
+  let high = arr.length - 1;
+
+  while (low <= high) {
+    const mid = low + Math.floor((high - low) / 2);
+    if (arr[mid] === target) return mid;
+
+    // Determine which half is sorted
+    if (arr[low] <= arr[mid]) {
+      // Left half is sorted
+      if (arr[low] <= target && target < arr[mid]) {
+        high = mid - 1; // target is in the sorted left half
+      } else {
+        low = mid + 1;  // target must be in the right half
+      }
+    } else {
+      // Right half is sorted
+      if (arr[mid] < target && target <= arr[high]) {
+        low = mid + 1;  // target is in the sorted right half
+      } else {
+        high = mid - 1; // target must be in the left half
+      }
+    }
+  }
+
+  return -1;
+}
+```
+
+---
+
+## Common interview patterns
+
+<CardGroup cols={2}>
+  <Card title="Binary search on the answer" icon="bullseye">
+    Instead of searching an array, binary search over the *answer space*. Define a monotone predicate — a function that is false below some threshold and true above it — then binary search for the threshold. Classic examples: minimum capacity to ship packages within D days, Koko eating bananas, finding the square root of a number.
+  </Card>
+  <Card title="Search space reduction" icon="magnifying-glass-minus">
+    Many 2D matrix problems that seem like O(n²) can be solved in O(n + m) by starting from the top-right corner and eliminating a row or column on each step. This is a generalization of binary search to two dimensions.
+  </Card>
+  <Card title="Find first true in boolean array" icon="circle-check">
+    If you have a condition that transitions from false to false...false to true to true...true (monotone), binary search finds the first `true` in O(log n). This is the core pattern for all "binary search on answer" problems.
+  </Card>
+  <Card title="Peak finding" icon="mountain">
+    Find a local maximum in an unsorted array in O(log n) by comparing `arr[mid]` with its neighbors. If `arr[mid] < arr[mid+1]`, the peak must be to the right; otherwise it is to the left or at `mid`. This works because the array is guaranteed to have a peak.
+  </Card>
+</CardGroup>
+
+<Tip>
+  Before applying binary search, ask: "Is my search space monotone?" — meaning, is there a clear point where some condition flips from false to true (or vice versa)? If yes, binary search applies even if you are not searching a sorted array.
+</Tip>
+
+---
+
+## Common pitfalls
+
+<CardGroup cols={2}>
+  <Card title="Off-by-one errors" icon="triangle-exclamation">
+    The most common bug in binary search. The loop condition `low <= high` and the updates `low = mid + 1` / `high = mid - 1` (not `mid`) are the correct standard form. Using `low < high` or `high = mid` instead can cause infinite loops or skip the last element. When in doubt, trace through a 2-element array by hand.
+  </Card>
+  <Card title="Forgetting the sorted precondition" icon="sort">
+    Binary search only works on a sorted (or at least monotone) array. Applying it to an unsorted array produces incorrect results silently — no error, just a wrong answer. Always verify or sort the input before applying binary search.
+  </Card>
+</CardGroup>
+
+---
+
+## How to explain searching algorithms in elitecode
+
+When practicing with elitecode, structure your explanation around the contrast between the two algorithms and when each applies.
+
+**Start with linear search:**
+> "Linear search is the brute-force approach. I scan every element from left to right until I find the target or reach the end. It's O(n) time and works on any array, sorted or not. The only advantage over binary search is that it requires no preconditions."
+
+**Introduce binary search's requirement:**
+> "Binary search requires the array to be sorted. The key insight is that if I look at the middle element and it's larger than my target, I know the target cannot be anywhere in the right half — I can throw away half the problem. This halving gives me O(log n) time: even in an array of a million elements, I find the answer in at most 20 steps."
+
+**Walk through the implementation:**
+> "I maintain two pointers, `low` and `high`, representing the current search window. I compute `mid` as `low + (high - low) / 2` — the safe formula that avoids integer overflow. If `arr[mid]` equals the target, I'm done. If it's less than the target, the target is to the right, so I set `low = mid + 1`. If it's greater, the target is to the left, so I set `high = mid - 1`. I repeat until `low > high`."
+
+**Cover the variants:**
+> "A common follow-up is finding the first or last occurrence in an array with duplicates. When I find a match, instead of returning immediately, I record the index and keep searching — left for the first occurrence, right for the last. This is called lower bound and upper bound."
+
+**Close with binary search on the answer:**
+> "The most powerful pattern is binary search on the answer space. If I can write a predicate that is monotone — false for small values and true for large ones — I can binary search over the answer range directly. This converts many optimization problems from brute-force to O(log n)."
+
+<Tip>
+  elitecode will ask follow-up questions like "what happens if there are duplicate elements?" and "can you binary search an unsorted array?" — have concrete, one-sentence answers ready for both.
+</Tip>
+
+---
+
+## Common interview questions
+
+<AccordionGroup>
+  <Accordion title="What is the difference between linear search and binary search?">
+    Linear search scans elements sequentially — O(n) time, no preconditions. Binary search eliminates half the search space on each step — O(log n) time, but **requires a sorted array** (or a monotone search space). For a single search on a small or unsorted array, linear search is simpler and sufficient. For repeated searches or large sorted datasets, the O(log n) cost of binary search is worth the precondition.
+  </Accordion>
+  <Accordion title="How do you handle duplicates in binary search?">
+    Standard binary search returns any matching index. To find the **first occurrence**, when you find a match, record the index and continue searching left (`high = mid - 1`). To find the **last occurrence**, record and continue searching right (`low = mid + 1`). These are the lower-bound and upper-bound variants. The count of a value in a sorted array is `upperBound(target) - lowerBound(target) + 1`.
+  </Accordion>
+  <Accordion title="How do you binary search a 2D matrix where each row is sorted?">
+    If the matrix is fully sorted (each row's last element is less than the next row's first element — like LeetCode 74), treat it as a flat sorted array of `m * n` elements. Map a 1D index `i` to 2D coordinates as `row = Math.floor(i / n)`, `col = i % n`. Run standard binary search using these mappings. Time complexity: O(log(m * n)).
+
+    If only each row is independently sorted (LeetCode 240 — each row and column sorted), use the staircase search from the top-right corner instead: O(m + n).
+  </Accordion>
+  <Accordion title="What does binary search on the answer mean?">
+    Binary search on the answer applies when you need to find the minimum or maximum value satisfying some condition, and that condition is monotone. Define a predicate `canSatisfy(x): boolean` that returns `true` for all values ≥ some threshold and `false` below it. Binary search over the answer range `[minPossible, maxPossible]` to find the threshold in O(log(range)) calls to `canSatisfy`.
+
+    Example: "What is the minimum number of days to ship all packages, given a ship capacity?" — the predicate is `canShip(capacity)`, which is monotone (more capacity is always easier). Binary search over capacities.
+  </Accordion>
+  <Accordion title="Why is the safe mid formula low + Math.floor((high - low) / 2) preferred over (low + high) / 2?">
+    In languages with fixed-size integers (Java's `int`, C's `int`), `low + high` can overflow when both values are large positive numbers (e.g., both near `Integer.MAX_VALUE`). The overflow wraps around to a negative number, making `mid` negative and causing an out-of-bounds access.
+
+    The formula `low + (high - low) / 2` avoids this: since `high >= low`, the subtraction is always non-negative and at most `high`, which is within bounds. In JavaScript, numbers are 64-bit floats and can represent integers up to 2⁵³ without loss, so overflow is not a practical concern — but using the safe formula is correct practice and expected in interviews.
+  </Accordion>
+</AccordionGroup>

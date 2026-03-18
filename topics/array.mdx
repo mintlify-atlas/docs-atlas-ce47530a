@@ -1,0 +1,151 @@
+---
+title: Array
+description: Contiguous memory storage for elements of the same type, with O(1) index-based access. The foundation of most data structure problems.
+---
+
+An array is a collection of elements stored in **contiguous memory locations**. Every element sits right next to the previous one in memory, which is why you can jump directly to any index in constant time — the CPU just calculates `base_address + index * element_size`.
+
+<Note>
+  Arrays are the most fundamental data structure. Almost every other structure — stacks, queues, heaps — can be implemented using an array underneath.
+</Note>
+
+## How arrays work in memory
+
+When you declare `const arr = [10, 20, 30, 40]`, your runtime allocates a single block of memory large enough to hold four elements side-by-side. Index 0 is at the start of that block; index 3 is exactly three "slots" forward.
+
+This contiguous layout gives you:
+- **Fast reads**: `arr[i]` is always O(1) — one arithmetic operation to find the address.
+- **Cache efficiency**: Iterating through an array hits the CPU cache well because neighboring elements are physically adjacent.
+- **Fixed-width elements**: Classic arrays hold one type so the runtime knows the exact byte stride.
+
+<Warning>
+  Inserting or deleting from the middle of an array requires shifting all elements after the insertion point — that's O(n) in the worst case.
+</Warning>
+
+## Time and space complexity
+
+| Operation        | Average | Worst | Notes                              |
+|------------------|---------|-------|------------------------------------|
+| Access by index  | O(1)    | O(1)  | Direct address calculation         |
+| Search (unsorted)| O(n)    | O(n)  | Must scan every element            |
+| Search (sorted)  | O(log n)| O(log n) | With binary search              |
+| Insert at end    | O(1)    | O(n)  | O(n) when array needs to resize    |
+| Insert at middle | O(n)    | O(n)  | Must shift elements right          |
+| Delete at end    | O(1)    | O(1)  | Just decrement length              |
+| Delete at middle | O(n)    | O(n)  | Must shift elements left           |
+
+**Space complexity**: O(n) — proportional to the number of elements stored.
+
+## TypeScript code examples
+
+```typescript
+// Declaring arrays
+const nums: number[] = [3, 1, 4, 1, 5, 9, 2, 6];
+const matrix: number[][] = [[1, 2], [3, 4], [5, 6]]; // 2D array
+
+// Access — O(1)
+const first = nums[0];  // 3
+const last = nums[nums.length - 1];  // 6
+
+// Mutate at end — O(1) amortized
+nums.push(5);          // append: [3, 1, 4, 1, 5, 9, 2, 6, 5]
+nums.pop();            // remove last: [3, 1, 4, 1, 5, 9, 2, 6]
+
+// Mutate at front — O(n)
+nums.unshift(0);       // prepend: [0, 3, 1, 4, ...]
+nums.shift();          // remove first: [3, 1, 4, ...]
+
+// Slice — O(k) where k is slice length, non-mutating
+const sub = nums.slice(1, 4); // [1, 4, 1]
+
+// Search — O(n)
+const idx = nums.indexOf(9);  // 5 (first occurrence)
+const found = nums.includes(9); // true
+
+// Two-pointer technique — O(n)
+function reverseArray(arr: number[]): number[] {
+  let left = 0;
+  let right = arr.length - 1;
+  while (left < right) {
+    [arr[left], arr[right]] = [arr[right], arr[left]];
+    left++;
+    right--;
+  }
+  return arr;
+}
+
+// Prefix sums — O(n) build, O(1) range query
+function buildPrefixSum(arr: number[]): number[] {
+  const prefix = new Array(arr.length + 1).fill(0);
+  for (let i = 0; i < arr.length; i++) {
+    prefix[i + 1] = prefix[i] + arr[i];
+  }
+  return prefix;
+}
+// Range sum [l, r] = prefix[r+1] - prefix[l]
+```
+
+## Common interview patterns
+
+<CardGroup cols={3}>
+  <Card title="Two pointers" icon="arrows-left-right">
+    Use a left and right pointer moving toward each other. Classic for pair sum, palindrome check, container with most water.
+  </Card>
+  <Card title="Sliding window" icon="window-maximize">
+    Maintain a window of size k or a variable window with a constraint. Classic for max subarray sum, longest substring without repeats.
+  </Card>
+  <Card title="Prefix sums" icon="sigma">
+    Pre-compute cumulative sums so any range query is O(1). Classic for subarray sum equals k, range sum queries.
+  </Card>
+</CardGroup>
+
+<Tip>
+  When you see a problem asking for a subarray, contiguous range, or a "window" — reach for two pointers or sliding window first.
+</Tip>
+
+## Common use cases
+
+- **Lookup tables**: Store precomputed results indexed by a key (e.g., `dp[i]` in dynamic programming).
+- **Buffers**: Network I/O and file systems read data into byte arrays.
+- **Matrix representation**: A 2D array `grid[row][col]` models grids, images, and graphs.
+- **Stacks and queues**: Both can be implemented over an array with index tracking.
+
+## How to explain it in elitecode
+
+When practicing with elitecode, your goal is to explain the concept as if teaching someone who has never seen it before. Here is a structure that works well:
+
+**Start with the mental model:**
+> "An array is a row of numbered boxes sitting side-by-side in memory. Because the boxes are right next to each other, I can jump directly to any box in constant time — I just multiply the index by the box size and add the starting address."
+
+**Then cover the trade-offs:**
+> "The downside is that inserting or removing from the middle is expensive — I have to physically slide all the other boxes over to fill the gap or make room. That's linear time."
+
+**Then mention access patterns:**
+> "Reading and writing by index is always O(1). Searching an unsorted array is O(n) because I might have to check every element. If the array is sorted, I can do binary search in O(log n)."
+
+**Close with interview relevance:**
+> "In interviews, arrays are usually combined with two pointers or sliding window techniques. The classic example is finding the maximum sum subarray of size k — you slide a window across in one pass."
+
+<Tip>
+  elitecode will ask follow-up questions like "what happens to the other elements when you insert at index 2?" — be ready to describe the shift operation step by step.
+</Tip>
+
+## Common interview questions
+
+<AccordionGroup>
+  <Accordion title="What is the difference between an array and a dynamic array (like JavaScript's Array or Java's ArrayList)?">
+    A static array has a fixed size determined at creation time. A dynamic array (like JavaScript's `Array` or Java's `ArrayList`) wraps a static array and automatically resizes — typically doubling capacity — when it runs out of space. The resize operation copies all elements to a new backing array, making it O(n) in the worst case. However, because resizes happen infrequently, the **amortized** cost of `push` is still O(1).
+  </Accordion>
+  <Accordion title="Why is inserting at the beginning of an array O(n)?">
+    To insert at index 0, every existing element must be shifted one position to the right to make room. With n elements, that's n shift operations — O(n). The same reasoning applies to deletion at the beginning.
+  </Accordion>
+  <Accordion title="When would you choose an array over a linked list?">
+    Choose an array when you need fast random access by index (O(1) vs O(n) for a linked list), when memory locality matters for cache performance, or when you know the maximum size upfront. Choose a linked list when you need frequent insertions/deletions at arbitrary positions and don't need random access.
+  </Accordion>
+  <Accordion title="What is a prefix sum array and when is it useful?">
+    A prefix sum array `P` where `P[i] = arr[0] + arr[1] + ... + arr[i-1]` lets you answer range sum queries in O(1): `sum(l, r) = P[r+1] - P[l]`. It's useful whenever a problem asks you to compute sums over many different subarrays — building the prefix array takes O(n), and each query is then O(1).
+  </Accordion>
+  <Accordion title="What is the two-pointer technique?">
+    The two-pointer technique uses two indices (usually `left` and `right`) that move through the array — either toward each other from opposite ends, or in the same direction at different speeds. It reduces many O(n²) brute-force approaches to O(n). Classic examples: removing duplicates from a sorted array, finding pairs that sum to a target, and the "container with most water" problem.
+  </Accordion>
+</AccordionGroup>

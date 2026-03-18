@@ -1,0 +1,387 @@
+---
+title: Sorting Algorithms
+description: Techniques to get a collection of elements in order. Covers O(n²), O(n log n), and linear-time algorithms with complexity trade-offs and TypeScript implementations.
+---
+
+Sorting is the process of rearranging a collection of elements into a defined order — typically ascending or descending. It is one of the most studied problems in computer science, and choosing the right algorithm for the situation is a core engineering skill.
+
+<Note>
+  The elitecode app groups sorting algorithms into three tiers based on time complexity: **O(n²)** algorithms (bubble sort, insertion sort, selection sort), **O(n log n)** algorithms (merge sort, quick sort, heap sort), and **"linear"** algorithms (bucket sort, counting sort).
+</Note>
+
+## Complexity reference table
+
+| Algorithm      | Best       | Average    | Worst      | Space   | Stable? |
+|----------------|------------|------------|------------|---------|--------|
+| Bubble sort    | O(n)       | O(n²)      | O(n²)      | O(1)    | Yes    |
+| Insertion sort | O(n)       | O(n²)      | O(n²)      | O(1)    | Yes    |
+| Selection sort | O(n²)      | O(n²)      | O(n²)      | O(1)    | No     |
+| Merge sort     | O(n log n) | O(n log n) | O(n log n) | O(n)    | Yes    |
+| Quick sort     | O(n log n) | O(n log n) | O(n²)      | O(log n)| No     |
+| Heap sort      | O(n log n) | O(n log n) | O(n log n) | O(1)    | No     |
+| Counting sort  | O(n + k)   | O(n + k)   | O(n + k)   | O(k)    | Yes    |
+| Bucket sort    | O(n + k)   | O(n + k)   | O(n²)      | O(n)    | Yes*   |
+
+*Bucket sort stability depends on the sort used within each bucket.
+
+A sort is **stable** if equal elements retain their original relative order after sorting. Stability matters when you sort by multiple keys (e.g., sort by last name, then by first name).
+
+---
+
+## O(n²) algorithms
+
+These algorithms use nested loops to compare and swap elements. They are inefficient on large inputs but have low overhead and are easy to implement — making them practical for small arrays (n ≤ ~50) or nearly-sorted data.
+
+### Bubble sort
+
+Bubble sort repeatedly walks through the array and **swaps adjacent elements that are out of order**. Each full pass "bubbles" the largest unsorted element to the end of the unsorted region.
+
+**Step through an example** — sorting `[5, 3, 8, 1]`:
+
+1. Pass 1: Compare 5↔3 → swap → `[3, 5, 8, 1]`. Compare 5↔8 → no swap. Compare 8↔1 → swap → `[3, 5, 1, 8]`. The 8 is now in its final position.
+2. Pass 2: Compare 3↔5 → no swap. Compare 5↔1 → swap → `[3, 1, 5, 8]`. The 5 is settled.
+3. Pass 3: Compare 3↔1 → swap → `[1, 3, 5, 8]`. Done.
+
+**When to use it**: Almost never in production. It is useful as a teaching example and acceptable when n is tiny (< 10). The one advantage is that if you track whether any swap happened in a pass, you can short-circuit early on an already-sorted array — that gives O(n) best-case.
+
+```typescript
+function bubbleSort(arr: number[]): number[] {
+  const a = [...arr]; // avoid mutating input
+  const n = a.length;
+  for (let i = 0; i < n - 1; i++) {
+    let swapped = false;
+    for (let j = 0; j < n - 1 - i; j++) {
+      if (a[j] > a[j + 1]) {
+        [a[j], a[j + 1]] = [a[j + 1], a[j]];
+        swapped = true;
+      }
+    }
+    if (!swapped) break; // already sorted — O(n) early exit
+  }
+  return a;
+}
+```
+
+### Insertion sort
+
+Insertion sort builds a sorted sub-array from left to right. For each new element, it **slides the element left** until it sits in the correct position among the already-sorted elements.
+
+**Step through an example** — sorting `[5, 3, 8, 1]`:
+
+1. Element 3: Compare with 5 → 3 < 5, shift 5 right → insert 3 → `[3, 5, 8, 1]`.
+2. Element 8: 8 > 5, stays in place → `[3, 5, 8, 1]`.
+3. Element 1: 1 < 8 → shift 8. 1 < 5 → shift 5. 1 < 3 → shift 3. Insert at index 0 → `[1, 3, 5, 8]`.
+
+**When to use it**: Great for **nearly-sorted data** (best-case O(n)), small arrays, or as the base case in hybrid sorts (Timsort uses insertion sort on small runs). It is also online — you can sort a stream of data without seeing all elements upfront.
+
+### Selection sort
+
+Selection sort divides the array into a sorted left portion and an unsorted right portion. On each pass it **finds the minimum element** in the unsorted portion and swaps it to the front of that portion.
+
+**Step through an example** — sorting `[5, 3, 8, 1]`:
+
+1. Find min in `[5, 3, 8, 1]` → 1 at index 3. Swap with index 0 → `[1, 3, 8, 5]`.
+2. Find min in `[3, 8, 5]` → 3 at index 1. Already in place → `[1, 3, 8, 5]`.
+3. Find min in `[8, 5]` → 5 at index 3. Swap with index 2 → `[1, 3, 5, 8]`.
+
+**When to use it**: When the cost of writing is expensive relative to reading (selection sort makes at most n−1 swaps, the fewest of any O(n²) sort). It is not stable — swapping can move equal elements past each other.
+
+<Warning>
+  Selection sort always runs in O(n²) regardless of input order — unlike bubble and insertion sort, it gets no benefit from a nearly-sorted array.
+</Warning>
+
+---
+
+## O(n log n) algorithms
+
+These algorithms use divide-and-conquer (or a heap) to achieve O(n log n) in the average and/or worst case. They are the workhorses of real-world sorting.
+
+### Merge sort
+
+Merge sort **recursively splits** the array in half until each sub-array has one element (trivially sorted), then **merges** pairs of sorted sub-arrays back together.
+
+**Divide and conquer approach**:
+1. If the array has 0 or 1 elements, return it.
+2. Split into left half and right half.
+3. Recursively sort left half and right half.
+4. Merge the two sorted halves into one sorted array by repeatedly picking the smaller front element.
+
+**Key properties**: Guaranteed O(n log n) in all cases. **Stable** — equal elements from the left half always come before equal elements from the right half. Requires O(n) extra space for the merge step.
+
+```typescript
+function mergeSort(arr: number[]): number[] {
+  if (arr.length <= 1) return arr;
+
+  const mid = Math.floor(arr.length / 2);
+  const left = mergeSort(arr.slice(0, mid));
+  const right = mergeSort(arr.slice(mid));
+
+  return merge(left, right);
+}
+
+function merge(left: number[], right: number[]): number[] {
+  const result: number[] = [];
+  let l = 0;
+  let r = 0;
+
+  while (l < left.length && r < right.length) {
+    if (left[l] <= right[r]) {
+      result.push(left[l++]);
+    } else {
+      result.push(right[r++]);
+    }
+  }
+
+  // Append any remaining elements
+  while (l < left.length) result.push(left[l++]);
+  while (r < right.length) result.push(right[r++]);
+
+  return result;
+}
+```
+
+**When to use merge sort**: When you need a **stable sort** with guaranteed O(n log n) worst-case. It is the standard choice for sorting linked lists (no random-access penalty) and external sorting (when data does not fit in memory).
+
+### Quick sort
+
+Quick sort picks a **pivot element**, partitions the array so all elements less than the pivot are on its left and all greater elements are on its right, then recursively sorts each partition.
+
+**Divide and conquer approach**:
+1. Pick a pivot (common choices: last element, random element, median-of-three).
+2. Partition: rearrange so that elements < pivot are to its left, elements > pivot to its right. The pivot is now in its final sorted position.
+3. Recursively sort the left and right partitions.
+
+**Key properties**: **In-place** (no extra array needed — O(log n) stack space for recursion). Average O(n log n). Worst case O(n²) when the pivot is always the min or max (already-sorted input with naive pivot selection). Not stable.
+
+```typescript
+function quickSort(arr: number[], low = 0, high = arr.length - 1): number[] {
+  if (low < high) {
+    const pivotIndex = partition(arr, low, high);
+    quickSort(arr, low, pivotIndex - 1);
+    quickSort(arr, pivotIndex + 1, high);
+  }
+  return arr;
+}
+
+function partition(arr: number[], low: number, high: number): number {
+  const pivot = arr[high]; // use last element as pivot
+  let i = low - 1;         // index of smaller element
+
+  for (let j = low; j < high; j++) {
+    if (arr[j] <= pivot) {
+      i++;
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+  }
+
+  // Place pivot in its final position
+  [arr[i + 1], arr[high]] = [arr[high], arr[i + 1]];
+  return i + 1;
+}
+```
+
+<Tip>
+  In practice, quick sort is often **faster than merge sort** despite the same big-O, because it has better cache locality (in-place) and lower constant factors. Most standard library `sort()` implementations use a variant of quick sort or a hybrid (Introsort) that falls back to heap sort to avoid the O(n²) worst case.
+</Tip>
+
+**When to use quick sort**: General-purpose in-memory sorting when stability is not required. Use randomized pivot selection to avoid the O(n²) worst case.
+
+### Heap sort
+
+Heap sort uses a **max-heap** data structure. It first builds a max-heap from the array (O(n)), then repeatedly extracts the maximum element and places it at the end of the array (O(n log n)).
+
+**Divide and conquer approach**:
+1. Build a max-heap from the input array (heapify every non-leaf node from bottom up).
+2. The root of the heap is the largest element — swap it with the last element.
+3. Reduce the heap size by one and heapify the root to restore the max-heap property.
+4. Repeat until the heap size is 1.
+
+**Key properties**: In-place O(1) extra space. Guaranteed O(n log n) worst-case. Not stable. In practice, heap sort is slower than quick sort due to poor cache locality (heap accesses are not sequential).
+
+**When to use heap sort**: When you need guaranteed O(n log n) worst-case **and** O(1) extra space, and stability is not required. Also useful for implementing a priority queue.
+
+---
+
+## Linear-time algorithms
+
+These algorithms sort without comparing elements directly against each other. Instead, they exploit information about the **structure of the input** (bounded integer values, uniform distribution) to sort in O(n + k) time.
+
+### Counting sort
+
+Counting sort works by **counting the frequency** of each distinct value, then reconstructing the sorted array from those counts. It requires the input values to be non-negative integers within a known range `[0, k]`.
+
+**How it works** — sorting `[4, 2, 2, 8, 3, 3, 1]` with k = 8:
+1. Allocate a count array of size k+1, initialized to zero.
+2. Count occurrences: `count[1]=1, count[2]=2, count[3]=2, count[4]=1, count[8]=1`.
+3. Compute prefix sums of counts to determine where each value starts in the output.
+4. Walk the input right-to-left, placing each element at its computed position (preserves stability).
+
+**Time complexity**: O(n + k). **Space complexity**: O(k) for the count array.
+
+**When applicable**: The input consists of integers in a small, known range. Classic use cases: sorting exam scores (0–100), sorting characters, radix sort's inner loop. Impractical when k >> n.
+
+```typescript
+function countingSort(arr: number[], maxVal: number): number[] {
+  const count = new Array(maxVal + 1).fill(0);
+
+  // Count occurrences
+  for (const num of arr) {
+    count[num]++;
+  }
+
+  // Reconstruct sorted array
+  const result: number[] = [];
+  for (let val = 0; val <= maxVal; val++) {
+    for (let c = 0; c < count[val]; c++) {
+      result.push(val);
+    }
+  }
+  return result;
+}
+```
+
+### Bucket sort
+
+Bucket sort **distributes elements into a number of buckets**, sorts each bucket individually (often with insertion sort), then concatenates the buckets in order. It works best when the input is **uniformly distributed** over a range.
+
+**How it works** — sorting `[0.78, 0.17, 0.39, 0.26, 0.72, 0.94, 0.21, 0.12]`:
+1. Create n buckets, each covering a sub-range (e.g., `[0, 0.1)`, `[0.1, 0.2)`, ...).
+2. Distribute elements: 0.78 → bucket 7, 0.17 → bucket 1, etc.
+3. Sort each bucket (with insertion sort — each bucket is small if distribution is uniform).
+4. Concatenate: bucket 0 + bucket 1 + ... + bucket n.
+
+**When applicable**: Input values are real numbers (or integers) drawn from a known, approximately uniform distribution. Useful for sorting floating-point numbers in `[0, 1)` or integers spread across a wide range.
+
+<Warning>
+  Bucket sort degrades to O(n²) in the worst case if all elements fall into the same bucket — e.g., a highly skewed distribution. Always verify that your input is roughly uniform before reaching for bucket sort.
+</Warning>
+
+---
+
+## How to choose a sorting algorithm
+
+<Tabs>
+  <Tab title="By input size">
+    - **n < 20**: insertion sort — low overhead, fast in practice.
+    - **20 ≤ n < 10,000**: quick sort (randomized pivot) or insertion sort.
+    - **n ≥ 10,000**: quick sort, merge sort, or heap sort.
+  </Tab>
+  <Tab title="By constraints">
+    - **Need stability**: merge sort or insertion sort (not quick sort or heap sort).
+    - **Need in-place (O(1) space)**: quick sort or heap sort (not merge sort).
+    - **Worst-case guarantee**: merge sort or heap sort (not quick sort).
+    - **Integers in bounded range**: counting sort or bucket sort.
+    - **Nearly sorted input**: insertion sort (O(n) best case).
+    - **Sorting a linked list**: merge sort (no random access penalty).
+  </Tab>
+  <Tab title="By use case">
+    - **General purpose, in-memory**: quick sort (or your language's built-in, typically Timsort/introsort).
+    - **External sort (data on disk)**: merge sort — merges chunks sequentially.
+    - **Streaming / online sort**: insertion sort — can accept new elements one at a time.
+    - **Top-k elements**: heap sort / partial heap — you don't need to sort everything.
+  </Tab>
+</Tabs>
+
+<Tip>
+  In interviews, the default answer is usually "I would use the built-in sort, which is Timsort in most runtimes and runs in O(n log n)". Know the built-in, then explain when and why you would deviate from it.
+</Tip>
+
+---
+
+## Common interview patterns
+
+<CardGroup cols={2}>
+  <Card title="Custom comparator sort" icon="arrow-up-down">
+    Sort objects by a specific field or multiple criteria using a comparator function. Example: sort intervals by start time — `intervals.sort((a, b) => a[0] - b[0])`. This is O(n log n) and is the first step in many greedy problems.
+  </Card>
+  <Card title="Sort + two pointers" icon="arrows-left-right">
+    Sort the array first, then apply two pointers to find pairs or triplets meeting a condition. Example: three-sum problem — sort, then for each element use a left/right pointer to find the complementary pair in O(n) per element.
+  </Card>
+  <Card title="Sort + binary search" icon="magnifying-glass">
+    Sort the input once, then use binary search for O(log n) lookups. Useful when you receive multiple queries against the same dataset.
+  </Card>
+  <Card title="Partial sort / top-k" icon="list-ol">
+    You rarely need to sort the entire array. Use a min-heap of size k to find the k largest elements in O(n log k), or use quickselect (partition-based) for O(n) average.
+  </Card>
+  <Card title="Counting sort as a frequency map" icon="hashtag">
+    When elements are characters or bounded integers, a frequency array doubles as a counting sort. Build the frequency map in O(n), then iterate the counts in O(k). Classic for anagram detection, character frequency problems.
+  </Card>
+  <Card title="Sort to detect duplicates" icon="copy">
+    Sorting brings equal elements adjacent. After sorting, one pass detects duplicates or finds the first missing element. Often simpler than a hash set if O(n log n) is acceptable and O(1) extra space is required.
+  </Card>
+</CardGroup>
+
+---
+
+## How to explain sorting algorithms in elitecode
+
+When practicing with elitecode, your goal is to explain the concept as if teaching someone who has never seen it before. Sorting has many algorithms — structure your explanation around the three complexity tiers.
+
+**Start with the overview:**
+> "Sorting algorithms fall into three main groups based on their time complexity. The simple O(n²) algorithms — bubble, insertion, selection — use nested loops. The efficient O(n log n) algorithms — merge sort, quick sort, heap sort — use divide and conquer or a heap. And the linear-time algorithms — counting sort, bucket sort — skip comparisons entirely by exploiting properties of the input."
+
+**Walk through one O(n²) algorithm concretely:**
+> "Take insertion sort. I maintain a sorted region on the left and grow it one element at a time. I pick the next element and shift everything in the sorted region that is larger than it one position to the right, then drop the element into the gap. If the array is already sorted, I never shift anything — that's the O(n) best case."
+
+**Explain merge sort's guarantee:**
+> "Merge sort is my go-to when I need guaranteed O(n log n). I split the array in half recursively until I have single-element arrays, then I merge pairs of sorted arrays back together. The merge step is O(n) and I do it O(log n) times — that's where the n log n comes from. It's also stable, which matters when I sort objects by multiple keys."
+
+**Address the quick sort trade-off:**
+> "Quick sort is usually faster in practice because it sorts in-place — no extra array needed. I pick a pivot, partition the array around it, and recurse. The danger is that a bad pivot choice — like always picking the smallest element on a sorted array — degrades to O(n²). Randomizing the pivot eliminates this in practice."
+
+**Close with when to use linear-time sorts:**
+> "If I know my input is integers in a small range — say, exam scores from 0 to 100 — I can use counting sort. I just count how many times each value appears and reconstruct the array. That's O(n + k) time and O(k) space. No comparisons needed."
+
+<Tip>
+  elitecode will ask follow-up questions like "why is merge sort stable but quick sort is not?" and "what is the worst-case input for quick sort?". Be ready to answer these concisely.
+</Tip>
+
+---
+
+## Common interview questions
+
+<AccordionGroup>
+  <Accordion title="Why is quick sort O(n²) in the worst case, and how do you avoid it?">
+    Quick sort's worst case occurs when the chosen pivot is always the smallest or largest element — one partition has n−1 elements and the other has 0. This produces n levels of recursion, each doing O(n) work: O(n²) total. Classic bad input: an already-sorted array with the pivot always chosen as the last element.
+
+    The fix is **randomized pivot selection**: pick the pivot uniformly at random before each partition. The probability of consistently bad pivots is negligible, making the expected time complexity O(n log n) for any input. Another option is **median-of-three**: choose the median of the first, middle, and last elements as the pivot, which avoids the worst case for sorted/reverse-sorted input.
+  </Accordion>
+  <Accordion title="Why does merge sort require O(n) extra space, and can you sort in-place?">
+    The merge step needs a temporary buffer to hold elements as they are merged — you cannot merge two sorted halves of an array in-place without destroying the order of one half. The temporary arrays across all merge levels add up to O(n) total.
+
+    True in-place merge sort exists but has O(n log² n) or O(n log n) time complexity with complex constant factors, making it impractical. If O(1) space is a hard requirement, use heap sort (in-place, O(n log n) worst-case) or quick sort (O(log n) stack space).
+  </Accordion>
+  <Accordion title="What is a stable sort and why does it matter?">
+    A stable sort preserves the original relative order of elements that compare as equal. For example, if you have records `[(Alice, 90), (Bob, 90), (Carol, 85)]` sorted by score, a stable sort guarantees Alice still appears before Bob (their original order) in the output.
+
+    Stability matters when you sort by multiple keys sequentially. To sort by last name then first name, you first sort (stably) by first name, then sort (stably) by last name. The stability of the second pass preserves the first-name ordering within each last-name group. If the sort is not stable, the first-name ordering is lost.
+  </Accordion>
+  <Accordion title="Can you sort an array of strings alphabetically with a custom comparator? What about case-insensitive?">
+    Yes. JavaScript/TypeScript's built-in `Array.prototype.sort` accepts a comparator `(a, b) => number`.
+
+    ```typescript
+    // Case-sensitive (default lexicographic order)
+    words.sort((a, b) => a.localeCompare(b));
+
+    // Case-insensitive
+    words.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+
+    // Sort objects by a numeric field
+    people.sort((a, b) => a.age - b.age);
+
+    // Sort by multiple fields: age ascending, name alphabetical on tie
+    people.sort((a, b) => a.age - b.age || a.name.localeCompare(b.name));
+    ```
+
+    Note that JavaScript's built-in sort is **not guaranteed to be stable** in older engines, but ES2019 standardized stable sort for V8 (Node.js ≥ 11) and modern browsers.
+  </Accordion>
+  <Accordion title="What is counting sort's limitation and when does it break down?">
+    Counting sort requires:
+    1. **Integer values** (or values mappable to non-negative integers).
+    2. A **known, bounded range** `[0, k]`.
+
+    It breaks down when `k` is very large relative to `n`. If you sort 100 numbers in the range `[0, 10⁹]`, counting sort needs a billion-element array — catastrophically wasteful in memory. In that case, a comparison-based sort (O(n log n)) or radix sort (treats the integer digit by digit) is the right choice.
+
+    Counting sort is ideal when k ≈ n or k is a small constant: sorting bytes (k = 255), sorting grades (k = 100), or as the inner loop of radix sort.
+  </Accordion>
+</AccordionGroup>

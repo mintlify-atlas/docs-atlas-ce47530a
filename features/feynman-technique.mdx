@@ -1,0 +1,104 @@
+---
+title: "Feynman technique"
+description: "How elitecode applies the Feynman technique to DSA practice — explain aloud, get AI feedback, repeat."
+---
+
+The Feynman technique is a learning method built on one premise: if you can explain a concept simply and clearly, you understand it. If you stumble, ramble, or resort to vague terms, you've found the exact gap in your knowledge.
+
+elitecode applies this directly to DSA practice. Instead of re-reading your notes or passively watching a walkthrough, you explain a topic aloud and let AI tell you whether your explanation holds up.
+
+## What the technique is
+
+The technique is named after physicist Richard Feynman, who believed that the best test of understanding was the ability to teach. The process has four steps:
+
+<Steps>
+  <Step title="Choose a concept">
+    Pick something you want to understand — not just recognize, but genuinely know.
+  </Step>
+  <Step title="Explain it in plain language">
+    Describe it as if you're teaching someone who has never heard of it. Avoid jargon. If you reach for a technical term, make sure you can also explain what that term means.
+  </Step>
+  <Step title="Identify the gaps">
+    Where you stumble or go vague is where your understanding breaks down. This is the most valuable part of the exercise.
+  </Step>
+  <Step title="Review and repeat">
+    Go back to the material, fill the gap, then explain again until the explanation is smooth.
+  </Step>
+</Steps>
+
+## Why it works for DSA
+
+Passive study — reading definitions, watching animations, highlighting notes — creates the feeling of understanding without the substance. You recognize a concept when you see it, but recognition is not the same as understanding.
+
+DSA topics are especially prone to this gap. It is easy to memorize that a hash table maps keys to values without being able to explain what happens when two keys hash to the same index, why that matters, or how separate chaining resolves it.
+
+Active teaching forces you to construct an explanation from scratch. That construction process is what reveals missing links.
+
+<Info>
+  Studies on the testing effect consistently show that retrieving and articulating knowledge produces stronger retention than passive review. Explaining aloud adds an additional layer: it surfaces the difference between knowing a definition and understanding the underlying mechanism.
+</Info>
+
+## How elitecode implements it
+
+elitecode turns the Feynman loop into a voice-driven practice session:
+
+<Steps>
+  <Step title="Select a topic">
+    The homepage shows a bento grid of nine DSA topics. Click any card to open the practice modal for that topic. The modal prompts you: **"Explain to me what [topic] is."**
+  </Step>
+  <Step title="Explain aloud">
+    Click the microphone icon to start recording. Explain the topic in your own words. Describe what it is, how it works internally, and when you would use it over an alternative. Click the icon again when you're done.
+  </Step>
+  <Step title="Receive AI evaluation">
+    Your recording is transcribed by the Whisper backend, then passed to GPT-3.5-turbo with the prompt: `"The user is explaining this topic, explain if it is a good explanation or not: {transcript}"`. The model returns up to 50 tokens of concise feedback.
+  </Step>
+  <Step title="Hear the feedback">
+    The AI feedback text is converted to speech by ElevenLabs and played back through the browser. You hear whether your explanation was correct and complete, and where it fell short.
+  </Step>
+</Steps>
+
+The loop is designed to be fast. A session typically takes under two minutes from clicking a topic card to hearing feedback. The low friction encourages repeated attempts.
+
+## Tips for effective sessions
+
+<Tip>
+  Explain like you're teaching, not reciting. Pretend your audience has never heard the term before. This forces you to build the explanation from first principles rather than reproducing a memorized definition.
+</Tip>
+
+<AccordionGroup>
+  <Accordion title="Cover the what, the how, and the when">
+    A complete explanation answers three questions:
+
+    - **What is it?** — define the structure or algorithm in plain terms
+    - **How does it work?** — describe the internal mechanism (how data is stored, how an operation runs step by step)
+    - **When would you use it?** — give a concrete use case and, if relevant, explain what makes it a better choice than the obvious alternative
+
+    The AI evaluates all three dimensions. An explanation that only defines the structure without explaining its mechanics will receive partial feedback.
+  </Accordion>
+  <Accordion title="Avoid placeholder phrases">
+    Phrases like "it's basically like..." or "you know, the thing where..." signal to both the AI and yourself that you're working around a gap. Name the mechanism directly. If you can't, that's the gap to study.
+  </Accordion>
+  <Accordion title="Don't rehearse — attempt cold">
+    The Feynman technique is most effective when you attempt the explanation before reviewing the material. A cold attempt surfaces what you actually know vs. what you think you know. Use the feedback to identify what to study, then try again.
+  </Accordion>
+  <Accordion title="Use the feedback to iterate">
+    If the AI says your explanation is incomplete, close the modal, review the topic, and open it again for another attempt. Each iteration should be faster and more precise than the last.
+  </Accordion>
+</AccordionGroup>
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Voice recorder" icon="microphone" href="/features/voice-recorder">
+    How the recording and audio visualizer work.
+  </Card>
+  <Card title="AI feedback" icon="brain" href="/features/ai-feedback">
+    How Whisper and GPT-3.5-turbo evaluate your explanation.
+  </Card>
+  <Card title="Text-to-speech" icon="volume" href="/features/text-to-speech">
+    How ElevenLabs speaks the feedback back to you.
+  </Card>
+  <Card title="Topics" icon="book" href="/features/topics">
+    All nine supported DSA topics.
+  </Card>
+</CardGroup>

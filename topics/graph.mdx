@@ -1,0 +1,224 @@
+---
+title: Graph
+description: A collection of nodes (vertices) connected by edges. Graphs model networks, maps, dependencies, and relationships — and are the foundation of BFS, DFS, and shortest-path algorithms.
+---
+
+A graph is a set of **vertices** (nodes) connected by **edges**. Unlike trees, graphs have no root and can contain cycles — any node can be connected to any other node. The source code in elitecode describes a graph as a "collection of nodes connected by edges."
+
+Graphs are everywhere: social networks (users are vertices, friendships are edges), maps (intersections are vertices, roads are edges), dependency systems (packages are vertices, `requires` relationships are edges).
+
+## Graph types
+
+| Property       | Description                                                                 |
+|----------------|-----------------------------------------------------------------------------|
+| **Directed**   | Edges have direction (A → B does not imply B → A). Models: Twitter follows, dependencies. |
+| **Undirected** | Edges are bidirectional (A — B means both A→B and B→A). Models: friendships, roads.       |
+| **Weighted**   | Each edge has a numeric weight (distance, cost, capacity). Used in shortest-path algorithms. |
+| **Unweighted** | All edges are equal. BFS finds shortest paths in terms of hop count.        |
+| **Cyclic**     | Contains at least one cycle. Most real-world graphs.                        |
+| **Acyclic**    | No cycles. A DAG (Directed Acyclic Graph) is used for dependency resolution and topological sort. |
+
+## Graph representations
+
+The two primary ways to store a graph in memory:
+
+### Adjacency list
+
+A map (or array) where each vertex stores a list of its neighbors.
+
+- **Space**: O(V + E) — efficient for sparse graphs.
+- **Check if edge exists**: O(degree of vertex).
+- **Iterate neighbors**: O(degree of vertex).
+- **Best for**: Most interview problems; real-world sparse graphs.
+
+### Adjacency matrix
+
+A 2D array `matrix[u][v] = 1` if there is an edge from u to v.
+
+- **Space**: O(V²) — expensive for large or sparse graphs.
+- **Check if edge exists**: O(1).
+- **Iterate all neighbors**: O(V).
+- **Best for**: Dense graphs; when you need O(1) edge existence checks.
+
+<Tip>
+  Almost all graph interview problems expect an adjacency list. If the problem gives you a grid (2D matrix), the grid itself is an implicit adjacency list — each cell's neighbors are the cells above, below, left, and right.
+</Tip>
+
+## Time and space complexity
+
+| Algorithm              | Time        | Space    | Notes                                  |
+|------------------------|-------------|----------|----------------------------------------|
+| BFS                    | O(V + E)    | O(V)     | Queue + visited set                    |
+| DFS                    | O(V + E)    | O(V)     | Stack (or recursion) + visited set     |
+| Dijkstra's (min-heap)  | O((V+E) log V) | O(V)  | Only for non-negative weights          |
+| Topological sort (DFS) | O(V + E)    | O(V)     | Only for DAGs                          |
+| Union-Find             | O(α(V))     | O(V)     | Nearly O(1) per operation; for components |
+
+*V = vertices, E = edges, α = inverse Ackermann function (effectively constant)*
+
+## TypeScript code examples
+
+```typescript
+// Build an adjacency list from an edge list
+function buildGraph(
+  n: number,
+  edges: [number, number][]
+): Map<number, number[]> {
+  const graph = new Map<number, number[]>();
+  for (let i = 0; i < n; i++) graph.set(i, []);
+  for (const [u, v] of edges) {
+    graph.get(u)!.push(v);
+    graph.get(v)!.push(u); // omit for directed graph
+  }
+  return graph;
+}
+
+// BFS — O(V + E)
+function bfs(graph: Map<number, number[]>, start: number): number[] {
+  const visited = new Set<number>();
+  const queue: number[] = [start];
+  const order: number[] = [];
+  visited.add(start);
+  while (queue.length > 0) {
+    const node = queue.shift()!;
+    order.push(node);
+    for (const neighbor of graph.get(node) ?? []) {
+      if (!visited.has(neighbor)) {
+        visited.add(neighbor);
+        queue.push(neighbor);
+      }
+    }
+  }
+  return order;
+}
+
+// DFS — iterative, O(V + E)
+function dfs(graph: Map<number, number[]>, start: number): number[] {
+  const visited = new Set<number>();
+  const stack: number[] = [start];
+  const order: number[] = [];
+  while (stack.length > 0) {
+    const node = stack.pop()!;
+    if (visited.has(node)) continue;
+    visited.add(node);
+    order.push(node);
+    for (const neighbor of graph.get(node) ?? []) {
+      if (!visited.has(neighbor)) stack.push(neighbor);
+    }
+  }
+  return order;
+}
+
+// Count connected components — O(V + E)
+function countComponents(
+  n: number,
+  edges: [number, number][]
+): number {
+  const graph = buildGraph(n, edges);
+  const visited = new Set<number>();
+  let count = 0;
+  for (let i = 0; i < n; i++) {
+    if (!visited.has(i)) {
+      bfs(graph, i).forEach(node => visited.add(node));
+      count++;
+    }
+  }
+  return count;
+}
+
+// Topological sort (Kahn's algorithm / BFS) — O(V + E)
+// Only valid for directed acyclic graphs (DAGs)
+function topologicalSort(
+  n: number,
+  prerequisites: [number, number][]
+): number[] {
+  const inDegree = new Array(n).fill(0);
+  const graph = new Map<number, number[]>();
+  for (let i = 0; i < n; i++) graph.set(i, []);
+  for (const [a, b] of prerequisites) {
+    graph.get(b)!.push(a);
+    inDegree[a]++;
+  }
+  const queue = inDegree
+    .map((deg, i) => ({ deg, i }))
+    .filter(x => x.deg === 0)
+    .map(x => x.i);
+  const order: number[] = [];
+  while (queue.length > 0) {
+    const node = queue.shift()!;
+    order.push(node);
+    for (const neighbor of graph.get(node) ?? []) {
+      inDegree[neighbor]--;
+      if (inDegree[neighbor] === 0) queue.push(neighbor);
+    }
+  }
+  return order.length === n ? order : []; // empty if cycle detected
+}
+```
+
+## Common interview patterns
+
+<CardGroup cols={3}>
+  <Card title="Connected components" icon="circle-nodes">
+    Count or label the distinct connected groups in an undirected graph. Run BFS/DFS from each unvisited node. Classic problems: Number of Islands (grid as implicit graph), Friend Circles.
+  </Card>
+  <Card title="Cycle detection" icon="rotate">
+    Undirected: DFS, check if a neighbor has been visited and is not the parent. Directed: DFS with a "in current path" set (gray/white/black coloring). Cycle detection is the first step in topological sort.
+  </Card>
+  <Card title="Topological sort" icon="list-ol">
+    Order nodes in a DAG so every directed edge goes from earlier to later. Use Kahn's algorithm (BFS with in-degree counts) or DFS with a post-order stack. Classic: course schedule, build dependencies.
+  </Card>
+</CardGroup>
+
+<Tip>
+  Grid problems (flood fill, number of islands, word search) are graph problems in disguise. Treat each cell as a vertex and the 4 adjacent cells as its neighbors.
+</Tip>
+
+## Common use cases
+
+- **Social networks**: Users are vertices; follows/friendships are edges. Recommendation engines run graph algorithms to find clusters.
+- **Maps and routing**: Dijkstra's or A* finds the shortest route between two locations on a weighted graph.
+- **Dependency graphs**: Package managers (npm, pip) build a DAG of packages and run topological sort to determine install order.
+- **Web crawling**: Pages are vertices; hyperlinks are directed edges. BFS from a seed URL discovers reachable pages.
+
+## How to explain it in elitecode
+
+**Start with the definition:**
+> "A graph is a collection of nodes, called vertices, connected by edges. Unlike a tree, a graph has no root, no required hierarchy, and can have cycles — any node can connect to any other node."
+
+**Cover the variants:**
+> "Graphs can be directed or undirected. In a directed graph, an edge from A to B doesn't mean there's an edge from B to A — like a one-way street. They can also be weighted, where each edge has a cost, or unweighted."
+
+**Explain representations:**
+> "The two main ways to store a graph are an adjacency list and an adjacency matrix. An adjacency list maps each vertex to its list of neighbors — it uses O(V + E) space and is efficient for sparse graphs. An adjacency matrix is a V×V grid where `matrix[u][v] = 1` means there's an edge — it uses O(V²) space but gives O(1) edge lookup. I almost always use adjacency lists in interviews."
+
+**Walk through BFS and DFS:**
+> "BFS uses a queue and visits nodes level by level — it finds the shortest path in an unweighted graph. DFS uses a stack (or recursion) and goes as deep as possible before backtracking — it's better for detecting cycles and doing topological sort."
+
+<Warning>
+  Always initialize a `visited` set before running BFS or DFS. Forgetting this on a cyclic graph will cause infinite loops.
+</Warning>
+
+## Common interview questions
+
+<AccordionGroup>
+  <Accordion title="What is the difference between BFS and DFS and when do you use each?">
+    **BFS** visits nodes level by level using a queue. It finds the **shortest path** in an unweighted graph. Use it for: shortest path, minimum steps, level-order processing.
+
+    **DFS** goes deep before backtracking using a stack or recursion. Use it for: cycle detection, topological sort, connected components, paths between nodes, backtracking problems.
+
+    Both are O(V + E) in time and O(V) in space.
+  </Accordion>
+  <Accordion title="How do you detect a cycle in a directed graph?">
+    Use DFS with three states per node: **unvisited** (white), **in current DFS path** (gray), **fully processed** (black). When you visit a neighbor that is gray (still on the current path), you've found a back edge — a cycle exists. If you finish processing a node without finding a gray neighbor, mark it black. This is O(V + E).
+  </Accordion>
+  <Accordion title="What is topological sort and what does it require?">
+    Topological sort produces a linear ordering of vertices in a **directed acyclic graph (DAG)** such that for every directed edge u → v, u comes before v in the ordering. It requires the graph to be a DAG — if there's a cycle, no valid topological ordering exists. Use Kahn's algorithm (BFS with in-degrees) or DFS with a post-order stack.
+  </Accordion>
+  <Accordion title="How does Dijkstra's algorithm work?">
+    Dijkstra's finds the shortest path from a source vertex to all others in a **weighted graph with non-negative edge weights**. It uses a min-heap (priority queue). Start with distance 0 for the source and infinity for all others. Repeatedly extract the vertex with the minimum tentative distance, then "relax" its neighbors — if going through the current vertex gives a shorter path to a neighbor, update the neighbor's distance and push it to the heap. Time complexity: O((V + E) log V) with a binary heap.
+  </Accordion>
+  <Accordion title="What is a Union-Find (Disjoint Set Union) and when is it useful?">
+    Union-Find is a data structure that tracks which elements belong to the same connected component. It supports two operations: `find(x)` (returns the root/representative of x's component) and `union(x, y)` (merges the components of x and y). With path compression and union by rank, both operations run in O(α(n)) — effectively constant. It's the most efficient structure for dynamic connectivity and Kruskal's MST algorithm.
+  </Accordion>
+</AccordionGroup>

@@ -1,0 +1,223 @@
+---
+title: "How it works"
+description: "A technical walkthrough of the elitecode AI pipeline, from topic selection to spoken feedback."
+---
+
+elitecode connects four services to turn a spoken DSA explanation into real-time AI feedback: a Next.js frontend, a self-hosted Whisper Flask backend, the OpenAI API, and the ElevenLabs TTS API.
+
+Here is the full pipeline:
+
+<Steps>
+  <Step title="User selects a topic">
+    The homepage renders a bento grid of DSA topics using the `BentoGrid` and `BentoGridItem` components. Each cell is clickable. When a cell is clicked, `Homepage` sets the active topic in state and renders a `ChatCard` modal:
+
+    ```typescript src/components/ui/Homepage.tsx
+    const handleClick = (title: string, index: number) => {
+      setPopup(!popup);
+      setTopic(title);
+      setActiveIndex(index);
+    };
+
+    // In the render:
+    {activeIndex === i && popup && (
+      <ChatCard onClose={handleClose} topic={item.title} />
+    )}
+    ```
+
+    The grid covers nine topics — array, linked list, tree, graph, hash table, heap, sorting algorithms, searching algorithms, and FIFO/LIFO data structures.
+  </Step>
+
+  <Step title="User records a voice explanation">
+    The `ChatCard` modal contains a `Recorder` component. On mount, `Recorder` calls `navigator.mediaDevices.getUserMedia` to request microphone access and stores the `MediaStream`.
+
+    When the user clicks the microphone icon, recording starts:
+
+    ```typescript src/components/Recorder.tsx
+    const mimeType = "audio/webm";
+
+    const startRecording = async () => {
+      const media = new MediaRecorder(stream, { mimeType: mimeType });
+      mediaRecorder.current = media;
+      mediaRecorder.current.start();
+
+      let localAudioChunks: Blob[] = [];
+      mediaRecorder.current.ondataavailable = (event) => {
+        if (event.data.size === 0) return;
+        localAudioChunks.push(event.data);
+      };
+      setAudioChunks(localAudioChunks);
+    };
+    ```
+
+    When the user clicks again to stop, the chunks are assembled into a single `audio/webm` Blob:
+
+    ```typescript src/components/Recorder.tsx
+    const stopRecording = () => {
+      mediaRecorder.current.stop();
+      mediaRecorder.current.onstop = () => {
+        const audioBlob = new Blob(audioChunks, { type: mimeType });
+        uploadAudio(audioBlob);
+        setAudioChunks([]);
+      };
+    };
+    ```
+
+    A live waveform visualizer (the `AudioVisualizer` component) renders the microphone signal to a `<canvas>` using the Web Audio API `AnalyserNode` while recording is active.
+  </Step>
+
+  <Step title="Audio is transcribed by the Whisper backend">
+    The WebM Blob is POSTed to `NEXT_PUBLIC_API_URL/whisper` as a `multipart/form-data` upload:
+
+    ```typescript src/components/ModulePopup.tsx
+    const formData = new FormData();
+    formData.append("audio", blob, "audio.webm");
+
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/whisper`,
+      { method: "POST", body: formData }
+    );
+
+    const result = await response.json();
+    const text =
+      result?.results?.[0]?.transcript ??
+      "Could not hear user, prompt an error message.";
+    ```
+
+    The Flask backend saves the upload to a temporary file and runs Whisper's `transcribe` method:
+
+    ```python src/python/app.py
+    @app.route('/whisper', methods=['POST'])
+    def whisper_handler():
+        results = []
+        for filename, handle in request.files.items():
+            temp = NamedTemporaryFile()
+            handle.save(temp)
+            result = model.transcribe(temp.name)
+            results.append({
+                'filename': filename,
+                'transcript': result['text'],
+            })
+        return {'results': results}
+    ```
+
+    The response JSON has the shape `{ results: [{ filename, transcript }] }`. The transcript is extracted and passed to the next stage.
+
+    <Note>
+      The Whisper backend automatically selects a CUDA device when an NVIDIA GPU is available, falling back to CPU otherwise:
+
+      ```python src/python/app.py
+      DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+      model = whisper.load_model("base", device=DEVICE)
+      ```
+
+      Running on GPU significantly reduces transcription latency. See [self-hosting/whisper-backend](/self-hosting/whisper-backend) for deployment details.
+    </Note>
+  </Step>
+
+  <Step title="GPT-3.5-turbo evaluates the explanation">
+    The transcript is passed to `getOpenAiResponse`, which calls the OpenAI Chat Completions API:
+
+    ```typescript src/pages/api/openai.ts
+    const openai = new OpenAI({
+      apiKey: process.env.NEXT_PUBLIC_OPENAI_API_KEY || '',
+      dangerouslyAllowBrowser: true,
+    });
+
+    async function getOpenAiResponse(prompt: string): Promise<string> {
+      const openAiResponse = await openai.chat.completions.create({
+        messages: [{
+          role: 'user',
+          content: "The user is explaining this topic, explain if it is a good explanation or not:" + prompt
+        }],
+        model: 'gpt-3.5-turbo',
+        max_tokens: 50,
+      });
+
+      return openAiResponse.choices[0].message.content ?? '';
+    }
+    ```
+
+    The prompt instructs the model to assess whether the user's explanation is correct and complete. The response is capped at 50 tokens to keep the feedback brief and easy to listen to.
+  </Step>
+
+  <Step title="ElevenLabs converts the feedback to speech">
+    The GPT response string is passed to `textToSpeech`, which calls the ElevenLabs API using the `eleven_multilingual_v2` model:
+
+    ```typescript src/pages/api/textToSpeech.ts
+    async function textToSpeech(
+      text: string,
+      voiceId: string = 'eYO9Ven76ACQ8Me4zQK4'
+    ) {
+      const options = {
+        method: 'POST',
+        headers: {
+          'xi-api-key': process.env.NEXT_PUBLIC_ELEVEN_API_KEY || '',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model_id: "eleven_multilingual_v2",
+          text: text,
+          voice_settings: {
+            similarity_boost: 0.9,
+            stability: 1
+          }
+        })
+      };
+
+      const response = await fetch(
+        `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_22050_32`,
+        options
+      );
+
+      const audioBlob = await response.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
+      return { audio_url: audioUrl };
+    }
+    ```
+
+    The API returns an MP3 stream (22,050 Hz, 32 kbps). The response body is read as a Blob, converted to an object URL, and returned.
+  </Step>
+
+  <Step title="Feedback is played back to the user">
+    Back in `ChatCard`, the object URL is assigned to a hidden `<audio>` element and played immediately:
+
+    ```typescript src/components/ModulePopup.tsx
+    const ttsResponse = await textToSpeech(openAIResponse);
+
+    if (ttsResponse) {
+      const audioPlayer = audioRef.current;
+      if (audioPlayer) {
+        audioPlayer.src = ttsResponse.audio_url;
+        audioPlayer.play();
+      }
+    }
+    ```
+
+    The user hears the AI's spoken assessment of their explanation. The loading spinner is dismissed and the modal returns to its idle state, ready for another attempt.
+  </Step>
+</Steps>
+
+## Pipeline summary
+
+| Stage | Technology | Input | Output |
+|---|---|---|---|
+| Topic selection | Next.js / React | Click | `ChatCard` modal |
+| Voice recording | MediaRecorder API | Microphone | `audio/webm` Blob |
+| Transcription | OpenAI Whisper (Flask) | WebM audio | Plain text |
+| Evaluation | GPT-3.5-turbo | Transcript | Feedback text |
+| Text-to-speech | ElevenLabs | Feedback text | MP3 audio URL |
+| Playback | HTMLAudioElement | MP3 URL | Spoken feedback |
+
+## Error handling
+
+Each stage in `uploadAudio` is wrapped in a single `try/catch`. If any step fails — a network error, a missing transcript, or a TTS API failure — the error is logged to the console and `isLoading` is reset to `false`. The modal remains open so the user can try again.
+
+```typescript src/components/ModulePopup.tsx
+try {
+  // whisper → openai → elevenlabs → play
+} catch (error) {
+  console.error("Error uploading file:", error);
+} finally {
+  setIsLoading(false);
+}
+```

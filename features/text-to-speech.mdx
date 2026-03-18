@@ -1,0 +1,159 @@
+---
+title: "Text-to-speech"
+description: "How elitecode converts AI feedback text to spoken audio using ElevenLabs and plays it back in the browser."
+---
+
+After GPT-3.5-turbo produces its evaluation, elitecode passes the feedback text to ElevenLabs to generate spoken audio. The MP3 is played back through a hidden `<audio>` element in the `ChatCard` modal. The implementation lives in `src/pages/api/textToSpeech.ts`.
+
+## The `textToSpeech` function
+
+```typescript src/pages/api/textToSpeech.ts
+async function textToSpeech(text: string, voiceId: string = 'eYO9Ven76ACQ8Me4zQK4') {
+  const options = {
+    method: 'POST',
+    headers: {
+      'xi-api-key': process.env.NEXT_PUBLIC_ELEVEN_API_KEY || '',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model_id: "eleven_multilingual_v2",
+      text: text,
+      voice_settings: {
+        similarity_boost: 0.9,
+        stability: 1
+      }
+    })
+  };
+
+  try {
+    const response = await fetch(
+      `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_22050_32`,
+      options
+    );
+
+    if (response.ok && response.headers.get("content-type")?.includes("audio")) {
+      const audioBlob = await response.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
+      return { audio_url: audioUrl };
+    } else {
+      throw new Error('Network response was not ok or the content type is not audio');
+    }
+  } catch (err) {
+    console.error(err);
+    return null;
+  }
+}
+
+export default textToSpeech;
+```
+
+## ElevenLabs configuration
+
+### Model
+
+The function uses the `eleven_multilingual_v2` model. This model supports 29 languages and produces natural-sounding speech with low latency. It is well-suited for short feedback responses.
+
+### Voice settings
+
+| Setting | Value | Effect |
+|---|---|---|
+| `similarity_boost` | `0.9` | High adherence to the reference voice's timbre and style |
+| `stability` | `1` | Maximum consistency — the voice does not vary between sentences |
+
+`stability: 1` ensures that repeated feedback sessions sound consistent. `similarity_boost: 0.9` keeps the output close to the selected voice's characteristics.
+
+### Output format
+
+| Property | Value |
+|---|---|
+| Format | `mp3_22050_32` |
+| Sample rate | 22,050 Hz |
+| Bitrate | 32 kbps |
+| Container | MP3 |
+
+The output format is appended as a query parameter: `?output_format=mp3_22050_32`. This format produces compact audio files appropriate for streaming short feedback phrases.
+
+### Default voice
+
+The default `voiceId` is `eYO9Ven76ACQ8Me4zQK4`. This is the voice used for all feedback sessions unless a different ID is passed as the second argument.
+
+**To change the voice**, pass a different ElevenLabs voice ID as the second argument when calling `textToSpeech`:
+
+```typescript
+const ttsResponse = await textToSpeech(openAIResponse, 'YOUR_VOICE_ID_HERE');
+```
+
+You can browse available voices and find their IDs in the [ElevenLabs Voice Library](https://elevenlabs.io/voice-library). Each voice has a unique ID that can be used as a drop-in replacement.
+
+<Info>
+  Voice cloning and custom voices are available on paid ElevenLabs plans. The default voice ID works on any plan that has access to the `eleven_multilingual_v2` model.
+</Info>
+
+## Audio response handling
+
+The function validates the response before treating it as audio:
+
+```typescript src/pages/api/textToSpeech.ts
+if (response.ok && response.headers.get("content-type")?.includes("audio")) {
+  const audioBlob = await response.blob();
+  const audioUrl = URL.createObjectURL(audioBlob);
+  return { audio_url: audioUrl };
+} else {
+  throw new Error('Network response was not ok or the content type is not audio');
+}
+```
+
+Both `response.ok` and the `content-type` header are checked. If either check fails — for example, due to an invalid API key or a rate limit response — the function throws and returns `null`.
+
+The response body is read as a `Blob` and converted to a local object URL via `URL.createObjectURL`. This URL is valid for the lifetime of the document.
+
+## Browser playback
+
+Back in `ChatCard`, the object URL is assigned to the `src` of a hidden `<audio>` element and played immediately:
+
+```typescript src/components/ModulePopup.tsx
+const ttsResponse = await textToSpeech(openAIResponse);
+
+if (ttsResponse) {
+  const audioPlayer = audioRef.current;
+  if (audioPlayer) {
+    audioPlayer.src = ttsResponse.audio_url;
+    audioPlayer
+      .play()
+      .catch((error) => console.error("Error playing audio:", error));
+  }
+}
+```
+
+The `<audio>` element is rendered with `style={{ visibility: "hidden" }}` — it is present in the DOM for playback but not visible to the user:
+
+```tsx src/components/ModulePopup.tsx
+<audio ref={audioRef} controls style={{ visibility: "hidden" }}></audio>
+```
+
+<Note>
+  Some browsers block autoplay of audio unless the user has interacted with the page. Because the user clicked the microphone icon to start recording, this interaction satisfies the browser's autoplay policy in most cases. If audio does not play, check your browser's autoplay settings.
+</Note>
+
+## Environment variable
+
+The ElevenLabs API key is read from `NEXT_PUBLIC_ELEVEN_API_KEY`:
+
+```typescript src/pages/api/textToSpeech.ts
+'xi-api-key': process.env.NEXT_PUBLIC_ELEVEN_API_KEY || ''
+```
+
+<Warning>
+  Because this variable uses the `NEXT_PUBLIC_` prefix, it is exposed in the browser bundle. Do not commit your `.env.local` file or expose this key in public repositories. For production deployments, move the ElevenLabs call to a server-side API route.
+</Warning>
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="AI feedback" icon="brain" href="/features/ai-feedback">
+    How GPT-3.5-turbo produces the text that is passed to ElevenLabs.
+  </Card>
+  <Card title="How it works" icon="lightbulb" href="/how-it-works">
+    The full pipeline from microphone to spoken feedback.
+  </Card>
+</CardGroup>

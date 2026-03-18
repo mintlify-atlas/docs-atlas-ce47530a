@@ -1,0 +1,81 @@
+---
+title: "Introduction"
+description: "Master data structures and algorithms by teaching them — the Feynman way."
+---
+
+# elitecode
+
+elitecode is an AI-powered learning platform that helps you truly understand data structures and algorithms — not just memorize them. Using the **Feynman technique**, you learn by explaining concepts aloud, and an AI evaluates your understanding and speaks back with feedback.
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Get up and running in minutes and start your first practice session.
+  </Card>
+  <Card title="How It Works" icon="lightbulb" href="/how-it-works">
+    Understand the AI pipeline behind elitecode.
+  </Card>
+  <Card title="Topics" icon="book" href="/topics/array">
+    Browse all supported DSA topics and start explaining.
+  </Card>
+  <Card title="Self-Hosting" icon="server" href="/self-hosting/overview">
+    Run elitecode on your own infrastructure.
+  </Card>
+</CardGroup>
+
+## What is the Feynman technique?
+
+The Feynman technique is a proven learning method: if you can explain a concept in simple terms, you truly understand it. If you can't, you've found exactly where your knowledge breaks down.
+
+elitecode applies this to DSA practice:
+
+1. **Choose a topic** from the bento grid (Array, Tree, Graph, etc.)
+2. **Explain it aloud** — describe what it is, how it works, and when to use it
+3. **Get AI feedback** — the AI listens, evaluates your explanation, and tells you whether you've nailed it or where you need to go deeper
+4. **Hear the feedback** — the response is spoken back to you using text-to-speech
+
+## Key features
+
+<CardGroup cols={2}>
+  <Card title="Voice-driven practice" icon="microphone">
+    Record your explanation using your microphone. No typing required.
+  </Card>
+  <Card title="Whisper transcription" icon="waveform">
+    OpenAI Whisper accurately transcribes your voice explanation to text.
+  </Card>
+  <Card title="GPT-powered evaluation" icon="brain">
+    GPT-3.5-turbo evaluates whether your explanation is correct and complete.
+  </Card>
+  <Card title="Spoken feedback" icon="volume">
+    ElevenLabs TTS reads the AI feedback back to you naturally.
+  </Card>
+  <Card title="9 DSA topics" icon="diagram-project">
+    Arrays, linked lists, trees, graphs, heaps, hash tables, stacks, queues, and more.
+  </Card>
+  <Card title="Audio visualizer" icon="chart-bar">
+    A live waveform visualizer shows your audio while you record.
+  </Card>
+</CardGroup>
+
+## Supported topics
+
+elitecode covers the most commonly tested DSA topics in technical interviews:
+
+| Category | Topics |
+|----------|--------|
+| Linear structures | Array, Linked List, Stack, Queue |
+| Hierarchical structures | Tree, Heap |
+| Associative structures | Hash Table |
+| Network structures | Graph |
+| Algorithms | Sorting, Searching |
+
+## Tech stack
+
+elitecode is built with:
+
+- **Next.js 14** — React framework for the frontend
+- **OpenAI Whisper** — Speech-to-text transcription (self-hosted via Flask)
+- **GPT-3.5-turbo** — AI evaluation of explanations
+- **ElevenLabs** — Text-to-speech for spoken AI feedback
+- **Framer Motion** — Smooth animations and transitions
+- **Tailwind CSS** — Utility-first styling
+- **Docker + CUDA** — GPU-accelerated Whisper backend

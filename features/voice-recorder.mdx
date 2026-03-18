@@ -1,0 +1,230 @@
+---
+title: "Voice recorder"
+description: "How elitecode captures your spoken DSA explanation using the MediaRecorder API and renders a live audio visualizer."
+---
+
+The voice recorder is the entry point to every practice session. It requests microphone access, captures your explanation as a WebM audio blob, and renders a real-time waveform while you speak. The implementation lives in `src/components/Recorder.tsx`.
+
+## Microphone permission
+
+When the `Recorder` component mounts, it immediately calls `getMicrophonePermission` to request access to the user's microphone:
+
+```typescript src/components/Recorder.tsx
+const getMicrophonePermission = async () => {
+  if ("MediaRecorder" in window) {
+    try {
+      const streamData = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: false,
+      });
+      setPermission(true);
+      setStream(streamData);
+    } catch (err: any) {
+      alert(err.message);
+    }
+  } else {
+    alert("The MediaRecorder API is not supported in your browser.");
+  }
+};
+
+useEffect(() => {
+  getMicrophonePermission();
+}, []);
+```
+
+The function checks that `MediaRecorder` is available in the browser before calling `navigator.mediaDevices.getUserMedia`. If the user denies permission or the browser does not support the API, an alert displays the error message.
+
+Once permission is granted, the `MediaStream` is stored in component state and passed to the `AudioVisualizer`.
+
+<Warning>
+  If the browser blocks the microphone permission prompt — for example because the page is not served over HTTPS or the user has previously denied access — the recording controls will not appear. Check your browser's site permissions if the microphone icon does not show.
+</Warning>
+
+## Recording lifecycle
+
+The recorder tracks state through a `recordingStatus` object with a `statisString` field. The field moves through three values:
+
+| State | Meaning |
+|---|---|
+| `inactive` | No recording in progress. The static microphone icon is shown. |
+| `recording` | Recording is active. The animated icon is shown. |
+| `processing` | Recording has stopped and the audio blob is being uploaded. Controlled externally via `isLoading`. |
+
+### Starting a recording
+
+When the user clicks the microphone icon in the `inactive` state, `startRecording` is called:
+
+```typescript src/components/Recorder.tsx
+const mimeType = "audio/webm";
+
+const startRecording = async () => {
+  if (mediaRecorder === null || stream === null) return;
+  if (pending) return;
+
+  setRecordingStatus((prevState) => ({
+    ...prevState,
+    statisString: "recording",
+  }));
+
+  const media = new MediaRecorder(stream, { mimeType: mimeType });
+  mediaRecorder.current = media;
+  mediaRecorder.current.start();
+
+  let localAudioChunks: Blob[] = [];
+  mediaRecorder.current.ondataavailable = (event) => {
+    if (typeof event.data === "undefined") return;
+    if (event.data.size === 0) return;
+    localAudioChunks.push(event.data);
+  };
+  setAudioChunks(localAudioChunks);
+};
+```
+
+A new `MediaRecorder` instance is created with the stored `MediaStream` and the `audio/webm` MIME type. Audio data is accumulated in `localAudioChunks` as the `ondataavailable` event fires.
+
+### Stopping a recording
+
+Clicking the icon in the `recording` state calls `stopRecording`:
+
+```typescript src/components/Recorder.tsx
+const stopRecording = () => {
+  if (mediaRecorder.current === null) return;
+  if (pending) return;
+
+  setRecordingStatus((prevState) => ({
+    ...prevState,
+    statisString: "inactive",
+  }));
+
+  mediaRecorder.current.stop();
+  mediaRecorder.current.onstop = () => {
+    const audioBlob = new Blob(audioChunks, { type: mimeType });
+    const audioUrl = URL.createObjectURL(audioBlob);
+    setAudio(audioUrl);
+    uploadAudio(audioBlob);
+    setAudioChunks([]);  
+  };
+};
+```
+
+When `stop()` is called, the `onstop` handler assembles all accumulated chunks into a single `Blob` of type `audio/webm`. The blob is converted to a local object URL for reference and passed to `uploadAudio`, which begins the transcription pipeline.
+
+## Click-to-toggle interaction
+
+Both icons — the static "not recording" image and the animated "recording" GIF — share the same click handler:
+
+```typescript src/components/Recorder.tsx
+const combinedFunctions = (mode: string) => {
+  if (mode == "recording") {
+    stopRecording();
+  } else {
+    startRecording();
+  }
+  toggleRecording();
+};
+```
+
+The current `statisString` value determines whether a click starts or stops recording. `toggleRecording` is the parent `ChatCard` state setter, kept in sync so the `AudioVisualizer` knows whether to animate.
+
+The icons render conditionally based on `recordingStatus.statisString`:
+
+- `inactive` and permission granted → static icon, clickable
+- `recording` → animated GIF icon, clickable
+- Permission not yet granted → **Get Microphone** button
+
+## Audio format
+
+| Property | Value |
+|---|---|
+| MIME type | `audio/webm` |
+| Capture API | `MediaRecorder` |
+| Delivery | Single `Blob` assembled from chunks on stop |
+| Upload field name | `audio` (sent as `multipart/form-data`) |
+| Upload filename | `audio.webm` |
+
+The WebM container format is used because it is supported natively by `MediaRecorder` in all major browsers.
+
+## AudioVisualizer
+
+The `AudioVisualizer` component renders a real-time frequency waveform to a `<canvas>` element while recording is active. It uses the Web Audio API `AnalyserNode` to read frequency data from the microphone stream on every animation frame.
+
+```typescript src/components/Recorder.tsx
+export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
+  audioStream,
+  isRecording,
+}) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const minBarHeight = 2;
+
+  useEffect(() => {
+    if (!audioStream || !canvasRef.current) return;
+
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+    const audioCtx = new AudioContext();
+    const analyser = audioCtx.createAnalyser();
+
+    const source = audioCtx.createMediaStreamSource(audioStream);
+    source.connect(analyser);
+    analyser.fftSize = 256;
+
+    const bufferLength = analyser.frequencyBinCount;  // 128 bins
+    const dataArray = new Uint8Array(bufferLength);
+    let animationFrameId: number;
+
+    const drawBars = () => {
+      animationFrameId = requestAnimationFrame(drawBars);
+      analyser.getByteFrequencyData(dataArray);
+
+      ctx.fillStyle = "#FFFFFF";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      const barWidth = (canvas.width / bufferLength) * 1.5;
+      let x = 0;
+
+      for (let i = 0; i < bufferLength; i++) {
+        let barHeight = minBarHeight;
+        if (isVisualizing) {
+          barHeight = Math.max(
+            minBarHeight,
+            (dataArray[i] / 128.0) * (canvas.height / 2)
+          );
+        }
+
+        ctx.fillStyle = `rgba(35, 43, 43)`;
+        ctx.fillRect(x, canvas.height / 2 - barHeight / 2, barWidth - 1, barHeight);
+        x += barWidth * 2.5;
+      }
+    };
+
+    drawBars();
+  }, [audioStream, isVisualizing]);
+
+  return <canvas ref={canvasRef} className="w-800 h-100" />;
+};
+```
+
+### How it works
+
+- An `AudioContext` is created and connected to the `MediaStream` via `createMediaStreamSource`.
+- An `AnalyserNode` with `fftSize = 256` produces 128 frequency bins.
+- `getByteFrequencyData` fills a `Uint8Array` with values from 0–255 representing the amplitude at each frequency.
+- `requestAnimationFrame` drives continuous redraws.
+- When `isRecording` is `false`, bars are drawn at `minBarHeight` (2 px), producing a flat baseline. When `true`, bar heights scale with the frequency data.
+- The canvas is cleared white (`#FFFFFF`) and bars are drawn in dark charcoal (`rgba(35, 43, 43)`) centered vertically.
+
+<Note>
+  The `AudioVisualizer` renders regardless of whether recording is active. It shows a flat baseline when inactive and an animated waveform during recording. This gives immediate visual feedback that the microphone is connected and listening.
+</Note>
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="AI feedback" icon="brain" href="/features/ai-feedback">
+    What happens after the audio blob is uploaded.
+  </Card>
+  <Card title="How it works" icon="lightbulb" href="/how-it-works">
+    The full pipeline from microphone to spoken feedback.
+  </Card>
+</CardGroup>
