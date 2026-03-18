@@ -1,0 +1,85 @@
+{
+  "projectType": "saas",
+  "projectName": "elitecode",
+  "projectDescription": "An AI-powered web app that helps users master data structures and algorithms by explaining concepts aloud using the Feynman technique, with voice transcription and GPT-powered feedback.",
+  "theme": "almond",
+  "primaryColor": "#7C3AED",
+  "lightColor": "#EDE9FE",
+  "darkColor": "#4C1D95",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": ["introduction", "quickstart", "how-it-works"]
+          },
+          {
+            "group": "Features",
+            "pages": [
+              "features/feynman-technique",
+              "features/voice-recorder",
+              "features/ai-feedback",
+              "features/text-to-speech",
+              "features/topics"
+            ]
+          },
+          {
+            "group": "Self-Hosting",
+            "pages": [
+              "self-hosting/overview",
+              "self-hosting/environment-variables",
+              "self-hosting/whisper-backend",
+              "self-hosting/deployment"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Topics",
+        "groups": [
+          {
+            "group": "Data Structures",
+            "pages": [
+              "topics/array",
+              "topics/linked-list",
+              "topics/stack-queue",
+              "topics/tree",
+              "topics/graph",
+              "topics/hash-table",
+              "topics/heap"
+            ]
+          },
+          {
+            "group": "Algorithms",
+            "pages": [
+              "topics/sorting-algorithms",
+              "topics/searching-algorithms"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Feynman technique-based DSA practice via voice explanation",
+    "Real-time voice recording with audio waveform visualization",
+    "Whisper (OpenAI) speech-to-text transcription via Flask backend",
+    "GPT-3.5-turbo AI evaluation of user explanations",
+    "ElevenLabs text-to-speech for spoken AI feedback",
+    "Interactive bento grid UI for topic selection",
+    "Coverage of 9 core DSA topics with animated visualizations",
+    "GPU-accelerated Whisper backend via CUDA Docker container"
+  ],
+  "publicApiSurface": [
+    "GET / — Whisper backend health check",
+    "POST /whisper — Upload audio file, returns transcript",
+    "getOpenAiResponse(prompt: string): Promise<string> — Evaluates user explanation",
+    "textToSpeech(text: string, voiceId?: string): Promise<{audio_url: string} | null> — Converts feedback to speech",
+    "transcript(prevState, formData: FormData) — Server action for audio transcription pipeline",
+    "Recorder component — Voice recording UI with waveform visualizer",
+    "ChatCard component — Modal for per-topic practice session",
+    "Homepage/BentoGrid — Topic selection grid UI"
+  ]
+}
